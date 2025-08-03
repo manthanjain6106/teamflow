@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
         name: validatedData.name,
         slug: validatedData.slug,
         description: validatedData.description,
+        createdById: session.user.id,
         members: {
           create: {
             userId: session.user.id,

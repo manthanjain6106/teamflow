@@ -25,7 +25,7 @@ interface Space {
   description?: string
   color?: string
   icon?: string
-  isPrivate: boolean
+  private: boolean
   workspaceId: string
 }
 
@@ -35,7 +35,7 @@ interface List {
   description?: string
   color?: string
   position: number
-  isArchived: boolean
+  archived: boolean
   spaceId: string
 }
 
@@ -52,13 +52,13 @@ interface Task {
   listId: string
   creatorId: string
   assigneeId?: string
-  parentId?: string
+  parentTaskId?: string
 }
 
 interface AppStore {
   // UI State
   sidebarCollapsed: boolean
-  currentView: 'LIST' | 'BOARD' | 'CALENDAR' | 'GANTT' | 'TIMELINE'
+  currentView: 'LIST' | 'BOARD' | 'CALENDAR' | 'GANTT' | 'TIMELINE' | 'TABLE' | 'MIND_MAP'
   selectedWorkspace?: Workspace
   selectedSpace?: Space
   selectedList?: List
@@ -76,7 +76,7 @@ interface AppStore {
   
   // Actions
   setSidebarCollapsed: (collapsed: boolean) => void
-  setCurrentView: (view: ViewType) => void
+  setCurrentView: (view: 'LIST' | 'BOARD' | 'CALENDAR' | 'GANTT' | 'TIMELINE' | 'TABLE' | 'MIND_MAP') => void
   setSelectedWorkspace: (workspace: Workspace) => void
   setSelectedSpace: (space: Space) => void
   setSelectedList: (list: List) => void

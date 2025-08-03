@@ -349,13 +349,15 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
 
       {/* Favorites */}
       <div className="px-2 py-2 border-b border-gray-200 dark:border-gray-700">
-        <button
-          onClick={() => toggleSection('favorites')}
+        <div
           onMouseEnter={() => setHoverSection('favorites')}
           onMouseLeave={() => setHoverSection(null)}
           className="flex items-center justify-between w-full px-2 py-1 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
         >
-          <div className="flex items-center">
+          <button
+            onClick={() => toggleSection('favorites')}
+            className="flex items-center flex-1 min-w-0"
+          >
             {expandedSections.favorites ? (
               <ChevronDown className="h-3 w-3 mr-1" />
             ) : (
@@ -363,13 +365,19 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
             )}
             <Star className="h-3 w-3 mr-1.5" />
             <span>FAVORITES</span>
-          </div>
+          </button>
           {hoverSection === 'favorites' && (
-            <button className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
+            <button 
+              className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded flex-shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Handle add favorite click here
+              }}
+            >
               <Plus className="h-3 w-3" />
             </button>
           )}
-        </button>
+        </div>
 
         {expandedSections.favorites && (
           <div className="mt-1 space-y-0.5">
@@ -393,26 +401,34 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
 
       {/* Spaces */}
       <div className="flex-1 px-2 py-2 overflow-y-auto">
-        <button
-          onClick={() => toggleSection('spaces')}
+        <div
           onMouseEnter={() => setHoverSection('spaces')}
           onMouseLeave={() => setHoverSection(null)}
           className="flex items-center justify-between w-full px-2 py-1 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
         >
-          <div className="flex items-center">
+          <button
+            onClick={() => toggleSection('spaces')}
+            className="flex items-center flex-1 min-w-0"
+          >
             {expandedSections.spaces ? (
               <ChevronDown className="h-3 w-3 mr-1" />
             ) : (
               <ChevronRight className="h-3 w-3 mr-1" />
             )}
             <span>SPACES</span>
-          </div>
+          </button>
           {hoverSection === 'spaces' && (
-            <button className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
+            <button 
+              className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded flex-shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Handle add space click here
+              }}
+            >
               <Plus className="h-3 w-3" />
             </button>
           )}
-        </button>
+        </div>
 
         {expandedSections.spaces && (
           <div className="mt-1 space-y-0.5">
@@ -431,15 +447,15 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
 
             {spaces && spaces.map((space: any) => (
               <div key={space.id} className="group">
-                <button
-                  onClick={() => handleSpaceClick(space)}
-                  className={`flex items-center w-full px-2 py-1 text-xs transition-colors rounded ${
-                    selectedSpace?.id === space.id
-                      ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <div className="flex items-center flex-1">
+                <div className={`flex items-center w-full px-2 py-1 text-xs transition-colors rounded ${
+                  selectedSpace?.id === space.id
+                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}>
+                  <button
+                    onClick={() => handleSpaceClick(space)}
+                    className="flex items-center flex-1 min-w-0"
+                  >
                     {expandedSpaces[space.id] ? (
                       <ChevronDown className="h-3 w-3 mr-1" />
                     ) : (
@@ -451,11 +467,17 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                     />
                     <FolderOpen className="h-3 w-3 mr-2" />
                     <span className="flex-1 truncate text-left">{space.name}</span>
-                  </div>
-                  <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
+                  </button>
+                  <button 
+                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded flex-shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Handle more options click here
+                    }}
+                  >
                     <MoreHorizontal className="h-3 w-3" />
                   </button>
-                </button>
+                </div>
 
                 {/* Lists under space */}
                 {expandedSpaces[space.id] && (

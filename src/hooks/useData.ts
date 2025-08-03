@@ -117,6 +117,7 @@ export function useTasks(params?: {
       setTasks(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
+      console.error('Task loading error:', err);
     } finally {
       setLoading(false);
     }
