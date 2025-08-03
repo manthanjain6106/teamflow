@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
-import { Search, Bell, Settings, User, Plus, MoreHorizontal, Hash, FolderOpen, Command } from 'lucide-react';
+import { Search, Bell, Settings, User, Plus, MoreHorizontal, Hash, FolderOpen, Command, List, LayoutGrid, Table, Calendar, BarChart3, Clock, Brain } from 'lucide-react';
 import GlobalSearch from '@/app/components/ui/GlobalSearch';
 
 export default function ClickUpHeader() {
@@ -108,43 +108,80 @@ export default function ClickUpHeader() {
             <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
               <button
                 onClick={() => setCurrentView('LIST')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`flex items-center space-x-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   currentView === 'LIST'
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                List
+                <List className="h-4 w-4" />
+                <span>List</span>
               </button>
               <button
                 onClick={() => setCurrentView('BOARD')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`flex items-center space-x-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   currentView === 'BOARD'
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                Board
+                <LayoutGrid className="h-4 w-4" />
+                <span>Board</span>
+              </button>
+              <button
+                onClick={() => setCurrentView('TABLE')}
+                className={`flex items-center space-x-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  currentView === 'TABLE'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Table className="h-4 w-4" />
+                <span>Table</span>
               </button>
               <button
                 onClick={() => setCurrentView('CALENDAR')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`flex items-center space-x-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   currentView === 'CALENDAR'
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                Calendar
+                <Calendar className="h-4 w-4" />
+                <span>Calendar</span>
               </button>
               <button
                 onClick={() => setCurrentView('GANTT')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`flex items-center space-x-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   currentView === 'GANTT'
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                Gantt
+                <BarChart3 className="h-4 w-4" />
+                <span>Gantt</span>
+              </button>
+              <button
+                onClick={() => setCurrentView('TIMELINE')}
+                className={`flex items-center space-x-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  currentView === 'TIMELINE'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                <span>Timeline</span>
+              </button>
+              <button
+                onClick={() => setCurrentView('MIND_MAP')}
+                className={`flex items-center space-x-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  currentView === 'MIND_MAP'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Brain className="h-4 w-4" />
+                <span>Mind Map</span>
               </button>
             </div>
           )}

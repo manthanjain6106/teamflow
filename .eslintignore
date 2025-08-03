@@ -1,0 +1,17 @@
+# Ignore build files
+.next/
+out/
+build/
+
+# Ignore auto-generated content
+*.d.ts
+next-env.d.ts
+
+# Ignore development files
+**/*.config.js
+**/*.config.ts
+**/scripts/**
+
+# Ignore specific problematic files temporarily
+src/lib/slack-example.ts
+src/lib/websocket.ts

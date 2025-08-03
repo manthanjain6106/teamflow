@@ -12,8 +12,8 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { data: session, status } = useSession();
-  const { sidebarCollapsed, selectedSpace, selectedList } = useStore();
+  const { status } = useSession();
+  const { selectedSpace, selectedList } = useStore();
 
   if (status === 'loading') {
     return (

@@ -5,9 +5,8 @@ import { devtools, persist } from 'zustand/middleware'
 interface User {
   id: string
   email: string
-  firstName?: string
-  lastName?: string
-  avatar?: string
+  name?: string
+  image?: string
   role: 'ADMIN' | 'MEMBER'
 }
 
@@ -16,7 +15,7 @@ interface Workspace {
   name: string
   slug: string
   description?: string
-  avatar?: string
+  image?: string
   role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'GUEST'
 }
 
@@ -77,7 +76,7 @@ interface AppStore {
   
   // Actions
   setSidebarCollapsed: (collapsed: boolean) => void
-  setCurrentView: (view: 'LIST' | 'BOARD' | 'CALENDAR' | 'GANTT' | 'TIMELINE') => void
+  setCurrentView: (view: ViewType) => void
   setSelectedWorkspace: (workspace: Workspace) => void
   setSelectedSpace: (space: Space) => void
   setSelectedList: (list: List) => void

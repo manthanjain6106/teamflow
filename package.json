@@ -3,13 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
+    "dev:next": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.js",
+    "start:next": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed-clickup": "tsx scripts/clickup-seed.ts",
+    "db:add-users": "tsx scripts/add-users.ts",
+    "db:seed-demo": "npx tsx scripts/seed-demo-data.ts",
+    "dev:turbo": "next dev --turbopack"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

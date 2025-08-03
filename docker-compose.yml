@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: teamflow-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: teamflow
+      MONGO_INITDB_ROOT_PASSWORD: teamflow_password_change_in_production
+      MONGO_INITDB_DATABASE: teamflow
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - teamflow-network
+
+  # TeamFlow Application
+  teamflow-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: teamflow-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mongodb://teamflow:teamflow_password_change_in_production@mongodb:27017/teamflow?authSource=admin
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=your-production-secret-key-here-change-this
+    depends_on:
+      - mongodb
+    networks:
+      - teamflow-network
+
+  # Nginx Reverse Proxy (optional for production)
+  nginx:
+    image: nginx:alpine
+    container_name: teamflow-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - teamflow-app
+    networks:
+      - teamflow-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  teamflow-network:
+    driver: bridge

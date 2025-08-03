@@ -154,17 +154,17 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 ### **Views**
 - ✅ **List View** - Traditional task list with grouping
 - ✅ **Board View** - Kanban board with drag-and-drop
-- 🚧 **Calendar View** - Task scheduling (coming soon)
-- 🚧 **Gantt View** - Project timeline (coming soon)
-- 🚧 **Timeline View** - Time-based visualization (coming soon)
+- ✅ **Calendar View** - Task scheduling with drag-drop functionality
+- ✅ **Gantt View** - Project timeline with task dependencies
+- ✅ **Timeline View** - Time-based task visualization
 
 ### **Collaboration**
 - ✅ User authentication and profiles
 - ✅ Workspace and space organization
-- 🚧 Real-time updates with WebSockets
-- 🚧 Comments and mentions
-- 🚧 Activity feeds
-- 🚧 Notifications
+- ✅ Real-time updates with Socket.IO WebSockets  
+- ✅ Comments and mentions system
+- ✅ Activity feeds and audit trails
+- ✅ Live notifications with real-time alerts
 
 ## 🔧 API Endpoints
 

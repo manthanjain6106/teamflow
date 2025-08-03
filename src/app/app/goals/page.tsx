@@ -1,134 +1,139 @@
 'use client';
 
-import { useState } from 'react';
-import { useGoals } from '@/hooks/useData';
+import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
-import { createGoal, updateGoal, deleteGoal } from '@/lib/api';
-import { Target, Plus, Calendar, TrendingUp, Users, CheckCircle2, AlertCircle, Clock, Loader2 } from 'lucide-react';
+import { useGoals } from '@/hooks/useData';
+import { 
+  Target, 
+  Plus, 
+  Calendar, 
+  TrendingUp, 
+  TrendingDown,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  User,
+  BarChart3
+} from 'lucide-react';
+
+interface Goal {
+  id: string;
+  title: string;
+  description?: string;
+  progress: number;
+  status: 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK' | 'COMPLETED';
+  dueDate?: string;
+  ownerId: string;
+  owner: {
+    id: string;
+    name: string;
+    image?: string;
+  };
+  keyResults: KeyResult[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface KeyResult {
+  id: string;
+  name: string;
+  target: number;
+  current: number;
+  progress: number;
+  goalId: string;
+}
 
 export default function GoalsPage() {
-  const [activeTab, setActiveTab] = useState('current');
   const { selectedWorkspace } = useStore();
-
-  const { goals, loading, error, refetch } = useGoals({
-    workspaceId: selectedWorkspace?.id,
-    status: activeTab === 'current' ? undefined : activeTab.toUpperCase(),
+  const { goals, loading, error, refetch } = useGoals({ 
+    workspaceId: selectedWorkspace?.id || '' 
   });
+  
+  const [filter, setFilter] = useState<'all' | 'my-goals' | 'active' | 'completed'>('all');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+  const [showGoalModal, setShowGoalModal] = useState(false);
 
-  const handleCreateGoal = async () => {
-    if (!selectedWorkspace?.id) return;
-    
-    const title = prompt('Enter goal title:');
-    if (!title) return;
-
-    try {
-      await createGoal({
-        title,
-        description: '',
-        workspaceId: selectedWorkspace.id,
-        keyResults: [
-          { name: 'Key Result 1', target: 100, current: 0 },
-        ],
-      });
-      refetch();
-    } catch (error) {
-      console.error('Failed to create goal:', error);
-    }
-  };
-
-  const handleUpdateGoalProgress = async (goalId: string, progress: number) => {
-    try {
-      await updateGoal({ id: goalId, progress });
-      refetch();
-    } catch (error) {
-      console.error('Failed to update goal:', error);
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'COMPLETED':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'ON_TRACK':
+        return <TrendingUp className="h-4 w-4 text-green-500" />;
+      case 'AT_RISK':
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+      case 'OFF_TRACK':
+        return <TrendingDown className="h-4 w-4 text-red-500" />;
+      default:
+        return <Clock className="h-4 w-4 text-gray-500" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ON_TRACK': return 'text-green-600 bg-green-100 dark:bg-green-900/30';
-      case 'AT_RISK': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
-      case 'OFF_TRACK': return 'text-red-600 bg-red-100 dark:bg-red-900/30';
-      case 'COMPLETED': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/30';
-      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ON_TRACK': return <CheckCircle2 className="h-4 w-4" />;
-      case 'AT_RISK': return <AlertCircle className="h-4 w-4" />;
-      case 'OFF_TRACK': return <AlertCircle className="h-4 w-4" />;
-      case 'COMPLETED': return <CheckCircle2 className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+      case 'COMPLETED':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      case 'ON_TRACK':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      case 'AT_RISK':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      case 'OFF_TRACK':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
   };
 
   const getProgressColor = (progress: number) => {
-    if (progress >= 80) return 'bg-green-600';
-    if (progress >= 60) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (progress >= 100) return 'bg-green-500';
+    if (progress >= 70) return 'bg-green-400';
+    if (progress >= 40) return 'bg-yellow-400';
+    return 'bg-red-400';
   };
 
-  const formatStatusName = (status: string) => {
-    switch (status) {
-      case 'ON_TRACK': return 'On Track';
-      case 'AT_RISK': return 'At Risk';
-      case 'OFF_TRACK': return 'Off Track';
-      case 'COMPLETED': return 'Completed';
-      default: return status;
+  const filteredGoals = goals.filter((goal: Goal) => {
+    switch (filter) {
+      case 'my-goals':
+        return goal.ownerId === 'current-user-id'; // Replace with actual user ID
+      case 'active':
+        return goal.status !== 'COMPLETED';
+      case 'completed':
+        return goal.status === 'COMPLETED';
+      default:
+        return true;
     }
+  });
+
+  const handleGoalClick = (goal: Goal) => {
+    setSelectedGoal(goal);
+    setShowGoalModal(true);
   };
 
-  if (!selectedWorkspace) {
-    return (
-      <div className="flex-1 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            No workspace selected
-          </h3>
-          <p className="text-gray-500">
-            Please select a workspace to view goals.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const isOverdue = (dateString: string) => {
+    return new Date(dateString) < new Date();
+  };
 
   if (loading) {
     return (
       <div className="flex-1 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="flex items-center space-x-2 text-gray-500">
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
           <span>Loading goals...</span>
         </div>
       </div>
     );
   }
-
-  if (error) {
-    return (
-      <div className="flex-1 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 mb-2">Failed to load goals</p>
-          <p className="text-gray-500 text-sm">{error}</p>
-          <button 
-            onClick={() => refetch()}
-            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const currentGoals = goals.filter((goal: any) => goal.status !== 'COMPLETED');
-  const completedGoals = goals.filter((goal: any) => goal.status === 'COMPLETED');
-
-  const displayGoals = activeTab === 'completed' ? completedGoals : currentGoals;
 
   return (
     <div className="flex-1 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
@@ -137,167 +142,285 @@ export default function GoalsPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Goals
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 flex items-center space-x-3">
+                <Target className="h-7 w-7 text-purple-600" />
+                <span>Goals & OKRs</span>
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
-                Track and manage your objectives and key results (OKRs)
+                Track objectives and key results for your team
               </p>
             </div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>New Goal</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center space-x-3">
-              <button 
-                onClick={handleCreateGoal}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                <span>New Goal</span>
-              </button>
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Goals</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{goals.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Completed</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {goals.filter((g: Goal) => g.status === 'COMPLETED').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">At Risk</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {goals.filter((g: Goal) => g.status === 'AT_RISK').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Progress</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {goals.length > 0 ? Math.round(goals.reduce((sum: number, g: Goal) => sum + g.progress, 0) / goals.length) : 0}%
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('current')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'current'
-                  ? 'border-purple-500 text-purple-600 dark:text-purple-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
-              }`}
-            >
-              Current Goals
-              <span className="ml-2 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-300 py-0.5 px-2 rounded-full text-xs">
-                {currentGoals.length}
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('completed')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'completed'
-                  ? 'border-purple-500 text-purple-600 dark:text-purple-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
-              }`}
-            >
-              Completed
-              <span className="ml-2 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-300 py-0.5 px-2 rounded-full text-xs">
-                {completedGoals.length}
-              </span>
-            </button>
-          </nav>
+        {/* Filter Tabs */}
+        <div className="mb-6">
+          <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
+            {[
+              { key: 'all', label: 'All Goals' },
+              { key: 'my-goals', label: 'My Goals' },
+              { key: 'active', label: 'Active' },
+              { key: 'completed', label: 'Completed' }
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setFilter(tab.key as any)}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  filter === tab.key
+                    ? 'bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Goals List */}
-        {displayGoals.length === 0 ? (
+        {/* Goals Grid */}
+        {filteredGoals.length === 0 ? (
           <div className="text-center py-12">
-            <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              No {activeTab} goals
+            <Target className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              {filter === 'all' ? 'No goals yet' : `No ${filter.replace('-', ' ')} found`}
             </h3>
-            <p className="text-gray-500 mb-4">
-              {activeTab === 'completed' 
-                ? "You haven't completed any goals yet." 
-                : "Create your first goal to get started."}
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Get started by creating your first goal to track progress and achievements.
             </p>
-            {activeTab === 'current' && (
-              <button
-                onClick={handleCreateGoal}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-              >
-                Create Goal
-              </button>
-            )}
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center space-x-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Plus className="h-5 w-5" />
+              <span>Create Your First Goal</span>
+            </button>
           </div>
         ) : (
-          <div className="space-y-6">
-            {displayGoals.map((goal: any) => (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredGoals.map((goal: Goal) => (
               <div
                 key={goal.id}
-                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+                onClick={() => handleGoalClick(goal)}
+                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all cursor-pointer group"
               >
                 {/* Goal Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <Target className="h-5 w-5 text-purple-600" />
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {goal.title}
-                      </h3>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(goal.status)}`}>
-                        {getStatusIcon(goal.status)}
-                        <span className="ml-1">{formatStatusName(goal.status)}</span>
+                    <div className="flex items-center space-x-2 mb-2">
+                      {getStatusIcon(goal.status)}
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(goal.status)}`}>
+                        {goal.status.replace('_', ' ')}
                       </span>
                     </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                      {goal.title}
+                    </h3>
                     {goal.description && (
-                      <p className="text-gray-600 dark:text-gray-400 mb-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
                         {goal.description}
                       </p>
                     )}
-                    <div className="flex items-center space-x-6 text-sm text-gray-500">
-                      <div className="flex items-center space-x-1">
-                        <Users className="h-4 w-4" />
-                        <span>{goal.owner?.name || 'Unknown'}</span>
-                      </div>
-                      {goal.dueDate && (
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>Due {new Date(goal.dueDate).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                      {goal.progress}%
-                    </div>
-                    <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${getProgressColor(goal.progress)}`}
-                        style={{ width: `${goal.progress}%` }}
-                      />
-                    </div>
+                  <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-opacity">
+                    <MoreHorizontal className="h-4 w-4 text-gray-400" />
+                  </button>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">{goal.progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${getProgressColor(goal.progress)}`}
+                      style={{ width: `${Math.min(goal.progress, 100)}%` }}
+                    />
                   </div>
                 </div>
 
-                {/* Key Results */}
+                {/* Key Results Preview */}
                 {goal.keyResults && goal.keyResults.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                      Key Results
-                    </h4>
-                    <div className="space-y-3">
-                      {goal.keyResults.map((kr: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                              {kr.name}
-                            </p>
-                            <div className="flex items-center space-x-4">
-                              <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                                <div
-                                  className={`h-2 rounded-full ${getProgressColor(kr.progress)}`}
-                                  style={{ width: `${kr.progress}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-gray-500 min-w-[60px]">
-                                {kr.current}/{kr.target}
-                              </span>
-                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 min-w-[40px]">
-                                {kr.progress}%
-                              </span>
-                            </div>
-                          </div>
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                      Key Results ({goal.keyResults.length})
+                    </p>
+                    <div className="space-y-1">
+                      {goal.keyResults.slice(0, 2).map((kr) => (
+                        <div key={kr.id} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-700 dark:text-gray-300 truncate flex-1 mr-2">
+                            {kr.name}
+                          </span>
+                          <span className="text-gray-500 font-mono">
+                            {kr.current}/{kr.target}
+                          </span>
                         </div>
                       ))}
+                      {goal.keyResults.length > 2 && (
+                        <p className="text-xs text-gray-500">
+                          +{goal.keyResults.length - 2} more
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
+
+                {/* Goal Footer */}
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-2">
+                    {goal.owner?.image ? (
+                      <img
+                        src={goal.owner.image}
+                        alt={goal.owner.name}
+                        className="w-5 h-5 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
+                        <User className="h-3 w-3 text-gray-500" />
+                      </div>
+                    )}
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {goal.owner?.name}
+                    </span>
+                  </div>
+                  
+                  {goal.dueDate && (
+                    <div className={`flex items-center space-x-1 ${
+                      isOverdue(goal.dueDate) ? 'text-red-600' : 'text-gray-600 dark:text-gray-400'
+                    }`}>
+                      <Calendar className="h-3 w-3" />
+                      <span>{formatDate(goal.dueDate)}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Create Goal Modal would go here */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Create New Goal
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Goal creation modal would be implemented here with form fields for title, description, key results, due date, etc.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                Create Goal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Goal Detail Modal would go here */}
+      {showGoalModal && selectedGoal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {selectedGoal.title}
+              </h2>
+              <button
+                onClick={() => setShowGoalModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Detailed goal view would show full description, all key results with progress tracking, timeline, owner details, and edit capabilities.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowGoalModal(false)}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

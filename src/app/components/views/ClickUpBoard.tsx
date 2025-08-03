@@ -2,19 +2,47 @@
 
 import { useState, useEffect } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCorners } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '@/store/useStore';
 import { useTasks } from '@/hooks/useData';
 import { createTask, updateTask, deleteTask } from '@/lib/api';
+import WorkingTaskModal from '../ui/WorkingTaskModal';
+
+interface Task {
+  id: string;
+  name: string;
+  description?: string;
+  status: 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELED';
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  dueDate?: string;
+  startDate?: string;
+  assigneeId?: string;
+  assignee?: {
+    id: string;
+    name: string;
+    email: string;
+    image?: string;
+  };
+  list: {
+    id: string;
+    name: string;
+    color?: string;
+  };
+  tags?: Array<{ tag: { name: string } }>;
+  _count?: {
+    comments: number;
+    attachments: number;
+  };
+  timeEntries?: Array<{ duration: number }>;
+}
+
 import {
   Plus,
   MoreHorizontal,
-  CheckSquare2,
   Calendar,
   User,
-  Flag,
   MessageSquare,
   Paperclip,
   Clock,
@@ -23,7 +51,6 @@ import {
   Minus,
   AlertCircle,
   Circle,
-  Settings,
   Loader2
 } from 'lucide-react';
 
@@ -31,16 +58,17 @@ interface BoardColumn {
   id: string;
   name: string;
   color: string;
-  tasks: any[];
+  tasks: Task[];
   limit?: number;
 }
 
 interface TaskCardProps {
-  task: any;
+  task: Task;
   isDragging?: boolean;
+  onClick?: (task: Task) => void;
 }
 
-function TaskCard({ task, isDragging = false }: TaskCardProps) {
+function TaskCard({ task, isDragging = false, onClick }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -85,6 +113,7 @@ function TaskCard({ task, isDragging = false }: TaskCardProps) {
       style={style}
       {...attributes}
       {...listeners}
+      onClick={() => onClick?.(task)}
       className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 mb-2 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing group ${
         isSortableDragging ? 'opacity-50 rotate-2 scale-105' : ''
       } ${isDragging ? 'opacity-50' : ''}`}
@@ -203,10 +232,12 @@ interface ClickUpBoardProps {
 }
 
 export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
-  const { currentView, selectedSpace, selectedList } = useStore();
-  const [activeTask, setActiveTask] = useState<any>(null);
+  const { selectedSpace, selectedList } = useStore();
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [boardColumns, setBoardColumns] = useState<BoardColumn[]>([]);
   const [newTaskNames, setNewTaskNames] = useState<Record<string, string>>({});
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isCreating, setIsCreating] = useState<Record<string, boolean>>({});
 
   // Fetch real tasks data
@@ -300,13 +331,37 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
     }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-    try {
-      await deleteTask(taskId);
-      refetch();
-    } catch (error) {
-      console.error('Failed to delete task:', error);
-    }
+  // Uncomment when delete functionality is needed
+  // const handleDeleteTask = async (taskId: string) => {
+  //   try {
+  //     await deleteTask(taskId);
+  //     refetch();
+  //   } catch (error) {
+  //     console.error('Failed to delete task:', error);
+  //   }
+  // };
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setShowTaskModal(true);
+  };
+
+  const handleTaskUpdate = () => {
+    refetch();
+    setShowTaskModal(false);
+    setSelectedTask(null);
+  };
+
+  const handleCreateTaskWithModal = (status: string) => {
+    const newTask: Partial<Task> = {
+      name: '',
+      description: '',
+      status: status as Task['status'],
+      priority: 'NORMAL',
+      assigneeId: ''
+    };
+    setSelectedTask(newTask as Task);
+    setShowTaskModal(true);
   };
 
   if (loading) {
@@ -384,7 +439,7 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
                 >
                   <div className="space-y-2">
                     {column.tasks.map((task) => (
-                      <TaskCard key={task.id} task={task} />
+                      <TaskCard key={task.id} task={task} onClick={handleTaskClick} />
                     ))}
                   </div>
                 </SortableContext>
@@ -392,31 +447,40 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
                 {/* Add Task Input */}
                 {selectedList && (
                   <div className="mt-3">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        placeholder="Add a task..."
-                        value={newTaskNames[column.id] || ''}
-                        onChange={(e) => setNewTaskNames(prev => ({ 
-                          ...prev, 
-                          [column.id]: e.target.value 
-                        }))}
-                        onKeyPress={(e) => e.key === 'Enter' && handleCreateTask(column.id)}
-                        className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
-                      />
-                      {newTaskNames[column.id]?.trim() && (
-                        <button
-                          onClick={() => handleCreateTask(column.id)}
-                          disabled={isCreating[column.id]}
-                          className="px-3 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center space-x-1"
-                        >
-                          {isCreating[column.id] ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Plus className="h-4 w-4" />
-                          )}
-                        </button>
-                      )}
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="text"
+                          placeholder="Add a task..."
+                          value={newTaskNames[column.id] || ''}
+                          onChange={(e) => setNewTaskNames(prev => ({ 
+                            ...prev, 
+                            [column.id]: e.target.value 
+                          }))}
+                          onKeyPress={(e) => e.key === 'Enter' && handleCreateTask(column.id)}
+                          className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
+                        />
+                        {newTaskNames[column.id]?.trim() && (
+                          <button
+                            onClick={() => handleCreateTask(column.id)}
+                            disabled={isCreating[column.id]}
+                            className="px-3 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center space-x-1"
+                          >
+                            {isCreating[column.id] ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Plus className="h-4 w-4" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleCreateTaskWithModal(column.id)}
+                        className="w-full px-3 py-2 text-sm text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Create with details</span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -442,6 +506,19 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Task Modal */}
+      {showTaskModal && (
+        <WorkingTaskModal
+          task={selectedTask}
+          isOpen={showTaskModal}
+          onClose={() => {
+            setShowTaskModal(false);
+            setSelectedTask(null);
+          }}
+          onSave={handleTaskUpdate}
+        />
+      )}
     </div>
   );
 }

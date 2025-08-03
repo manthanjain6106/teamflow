@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const assigneeId = searchParams.get('assigneeId')
 
-    let whereClause: any = {}
+    const whereClause: Record<string, unknown> = {}
 
     if (listId) {
       // Check access through list
@@ -106,19 +106,17 @@ export async function GET(request: NextRequest) {
         creator: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
+            name: true,
             email: true,
-            avatar: true
+            image: true
           }
         },
         assignee: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
+            name: true,
             email: true,
-            avatar: true
+            image: true
           }
         },
         list: {
@@ -249,19 +247,17 @@ export async function POST(request: NextRequest) {
         creator: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
+            name: true,
             email: true,
-            avatar: true
+            image: true
           }
         },
         assignee: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
+            name: true,
             email: true,
-            avatar: true
+            image: true
           }
         },
         list: {
@@ -407,19 +403,17 @@ export async function PATCH(request: NextRequest) {
         creator: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
+            name: true,
             email: true,
-            avatar: true
+            image: true
           }
         },
         assignee: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
+            name: true,
             email: true,
-            avatar: true
+            image: true
           }
         },
         list: {
@@ -467,7 +461,7 @@ export async function PATCH(request: NextRequest) {
       await prisma.activity.create({
         data: {
           type: 'TASK_ASSIGNED',
-          message: `Assigned task to ${task.assignee?.firstName} ${task.assignee?.lastName}`,
+          message: `Assigned task to ${task.assignee?.name}`,
           taskId: task.id,
           userId: session.user.id,
           data: {
