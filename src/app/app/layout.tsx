@@ -1,7 +1,8 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { FolderOpen, Hash } from 'lucide-react';
 import ClickUpSidebar from '@/app/components/layout/ClickUpSidebar';
 import ClickUpHeader from '@/app/components/layout/ClickUpHeader';
@@ -13,7 +14,15 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { status } = useSession();
+  const router = useRouter();
   const { selectedSpace, selectedList } = useStore();
+
+  // Handle authentication redirect
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+    }
+  }, [status, router]);
 
   if (status === 'loading') {
     return (
@@ -27,7 +36,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   if (status === 'unauthenticated') {
-    redirect('/auth/signin');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          <p className="text-gray-600 dark:text-gray-400">Redirecting to sign in...</p>
+        </div>
+      </div>
+    );
   }
 
   const getPageTitle = () => {
@@ -68,11 +84,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <ClickUpHeader 
-          title={getPageTitle()}
-          breadcrumbs={getBreadcrumbs()}
-          showViewSwitcher={!!(selectedSpace || selectedList)}
-        />
+        <ClickUpHeader />
         
         {/* Main Content */}
         <main className="flex-1 overflow-hidden">

@@ -2,12 +2,28 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
-import { Search, Bell, Settings, User, Plus, MoreHorizontal, Hash, FolderOpen, Command, List, LayoutGrid, Table, Calendar, BarChart3, Clock, Brain } from 'lucide-react';
+import { Search, Bell, Settings, User, Plus, MoreHorizontal, Hash, FolderOpen, Command, List, LayoutGrid, Table, Calendar, BarChart3, Clock, Brain, CheckSquare2, FileText, Target } from 'lucide-react';
 import GlobalSearch from '@/app/components/ui/GlobalSearch';
+import { useRouter } from 'next/navigation';
 
-export default function ClickUpHeader() {
+interface ClickUpHeaderProps {
+  title?: string;
+  breadcrumbs?: Array<{
+    name: string;
+    href: string;
+    icon: any;
+  }>;
+  showViewSwitcher?: boolean;
+}
+
+export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, showViewSwitcher }: ClickUpHeaderProps) {
   const { selectedWorkspace, selectedSpace, selectedList, currentView, setCurrentView } = useStore();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const router = useRouter();
 
   // Handle Cmd+K / Ctrl+K shortcut
   useEffect(() => {
@@ -20,6 +36,26 @@ export default function ClickUpHeader() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Close all menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      
+      // Check if click is outside all menu areas
+      const isOutsideMenus = !target.closest('[data-menu]');
+      
+      if (isOutsideMenus) {
+        setShowUserMenu(false);
+        setShowNotifications(false);
+        setShowMoreMenu(false);
+        setShowCreateMenu(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
   // Generate page title and breadcrumbs
@@ -60,6 +96,76 @@ export default function ClickUpHeader() {
   };
 
   const breadcrumbs = getBreadcrumbs();
+
+  // Handle navigation actions
+  const handlePlusClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowCreateMenu(!showCreateMenu);
+    setShowUserMenu(false);
+    setShowNotifications(false);
+    setShowMoreMenu(false);
+  };
+
+  const handleBellClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowNotifications(!showNotifications);
+    setShowUserMenu(false);
+    setShowMoreMenu(false);
+    setShowCreateMenu(false);
+  };
+
+  const handleSettingsClick = () => {
+    router.push('/app/settings');
+  };
+
+  const handleMoreClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMoreMenu(!showMoreMenu);
+    setShowUserMenu(false);
+    setShowNotifications(false);
+    setShowCreateMenu(false);
+  };
+
+  const handleUserClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowUserMenu(!showUserMenu);
+    setShowNotifications(false);
+    setShowMoreMenu(false);
+    setShowCreateMenu(false);
+  };
+
+  const handleCreateItem = (type: string) => {
+    console.log(`Creating new ${type}`);
+    setShowCreateMenu(false);
+    
+    // Here you would typically open a modal or navigate to create page
+    switch (type) {
+      case 'task':
+        // Open task creation modal
+        console.log('Open task creation modal');
+        break;
+      case 'list':
+        // Open list creation modal
+        console.log('Open list creation modal');
+        break;
+      case 'space':
+        // Open space creation modal
+        console.log('Open space creation modal');
+        break;
+      case 'workspace':
+        // Navigate to workspace creation
+        console.log('Navigate to workspace creation');
+        break;
+      case 'document':
+        // Open document creation
+        console.log('Open document creation');
+        break;
+      case 'goal':
+        // Open goal creation
+        console.log('Open goal creation');
+        break;
+    }
+  };
 
   return (
     <>
@@ -187,31 +293,178 @@ export default function ClickUpHeader() {
           )}
 
           {/* Action buttons */}
-          <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+          <button 
+            onClick={handlePlusClick}
+            className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors relative group"
+            title="Create new item"
+          >
             <Plus className="h-5 w-5" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
           </button>
           
-          <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+          <button 
+            onClick={handleBellClick}
+            className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors relative"
+            title="Notifications"
+          >
             <Bell className="h-5 w-5" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
           
-          <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+          <button 
+            onClick={handleSettingsClick}
+            className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            title="Settings"
+          >
             <Settings className="h-5 w-5" />
           </button>
           
-          <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+          <button 
+            onClick={handleMoreClick}
+            className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            title="More options"
+          >
             <MoreHorizontal className="h-5 w-5" />
           </button>
 
           {/* User avatar */}
-          <div className="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+          <button
+            onClick={handleUserClick}
+            className="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-medium hover:bg-purple-700 transition-colors"
+            title="User menu"
+          >
             <User className="h-4 w-4" />
-          </div>
+          </button>
         </div>
       </header>
 
       {/* Global Search Modal */}
       <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+
+      {/* Create Menu Dropdown */}
+      {showCreateMenu && (
+        <div className="absolute right-0 top-14 mt-1 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50" data-menu>
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Create New</h3>
+          </div>
+          <div className="py-2">
+            <button
+              onClick={() => handleCreateItem('task')}
+              className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+            >
+              <CheckSquare2 className="h-4 w-4 mr-3 text-blue-600" />
+              <div>
+                <div className="font-medium">Task</div>
+                <div className="text-xs text-gray-500">Create a new task</div>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleCreateItem('list')}
+              className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+            >
+              <Hash className="h-4 w-4 mr-3 text-green-600" />
+              <div>
+                <div className="font-medium">List</div>
+                <div className="text-xs text-gray-500">Create a new list</div>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleCreateItem('space')}
+              className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+            >
+              <FolderOpen className="h-4 w-4 mr-3 text-purple-600" />
+              <div>
+                <div className="font-medium">Space</div>
+                <div className="text-xs text-gray-500">Create a new space</div>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleCreateItem('workspace')}
+              className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+            >
+              <BarChart3 className="h-4 w-4 mr-3 text-orange-600" />
+              <div>
+                <div className="font-medium">Workspace</div>
+                <div className="text-xs text-gray-500">Create a new workspace</div>
+              </div>
+            </button>
+            
+            <hr className="my-2 border-gray-200 dark:border-gray-700" />
+            
+            <button
+              onClick={() => handleCreateItem('document')}
+              className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+            >
+              <FileText className="h-4 w-4 mr-3 text-yellow-600" />
+              <div>
+                <div className="font-medium">Document</div>
+                <div className="text-xs text-gray-500">Create a new document</div>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleCreateItem('goal')}
+              className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+            >
+              <Target className="h-4 w-4 mr-3 text-teal-600" />
+              <div>
+                <div className="font-medium">Goal</div>
+                <div className="text-xs text-gray-500">Create a new goal</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications Dropdown */}
+      {showNotifications && (
+        <div className="absolute right-0 top-14 mt-1 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50" data-menu>
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
+          </div>
+          <div className="p-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">No new notifications</p>
+          </div>
+        </div>
+      )}
+
+      {/* More Menu Dropdown */}
+      {showMoreMenu && (
+        <div className="absolute right-0 top-14 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50" data-menu>
+          <div className="py-1">
+            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+              Import data
+            </button>
+            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+              Export data
+            </button>
+            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+              Help & Support
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* User Menu Dropdown */}
+      {showUserMenu && (
+        <div className="absolute right-0 top-14 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50" data-menu>
+          <div className="py-1">
+            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+              Profile
+            </button>
+            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+              Account settings
+            </button>
+            <hr className="my-1 border-gray-200 dark:border-gray-700" />
+            <button className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700">
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

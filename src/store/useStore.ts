@@ -77,9 +77,9 @@ interface AppStore {
   // Actions
   setSidebarCollapsed: (collapsed: boolean) => void
   setCurrentView: (view: 'LIST' | 'BOARD' | 'CALENDAR' | 'GANTT' | 'TIMELINE' | 'TABLE' | 'MIND_MAP') => void
-  setSelectedWorkspace: (workspace: Workspace) => void
-  setSelectedSpace: (space: Space) => void
-  setSelectedList: (list: List) => void
+  setSelectedWorkspace: (workspace: Workspace | undefined) => void
+  setSelectedSpace: (space: Space | undefined) => void
+  setSelectedList: (list: List | undefined) => void
   setUser: (user: User) => void
   setWorkspaces: (workspaces: Workspace[]) => void
   setSpaces: (spaces: Space[]) => void

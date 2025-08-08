@@ -246,6 +246,15 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
             <Link
               key={index}
               href={item.href}
+              onClick={(e) => {
+                e.preventDefault();
+                console.log(`🔗 [Collapsed] Clicked navigation link: ${item.name} -> ${item.href}`);
+                console.log(`📍 Current pathname: ${pathname}`);
+                console.log(`✅ Link is active: ${item.active}`);
+                
+                // Force navigation
+                window.location.href = item.href;
+              }}
               className={`w-full h-8 flex items-center justify-center mx-1 rounded transition-colors relative group ${
                 item.active
                   ? 'bg-purple-100 dark:bg-purple-900/30'
@@ -330,6 +339,15 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
           <Link
             key={index}
             href={item.href}
+            onClick={(e) => {
+              e.preventDefault();
+              console.log(`🔗 Clicked navigation link: ${item.name} -> ${item.href}`);
+              console.log(`📍 Current pathname: ${pathname}`);
+              console.log(`✅ Link is active: ${item.active}`);
+              
+              // Force navigation
+              window.location.href = item.href;
+            }}
             className={`flex items-center px-2 py-1.5 rounded text-sm font-medium transition-colors relative group ${
               item.active
                 ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
@@ -372,6 +390,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
               onClick={(e) => {
                 e.stopPropagation();
                 // Handle add favorite click here
+                console.log('Add to favorites');
               }}
             >
               <Plus className="h-3 w-3" />
@@ -423,6 +442,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
               onClick={(e) => {
                 e.stopPropagation();
                 // Handle add space click here
+                console.log('Create new space');
               }}
             >
               <Plus className="h-3 w-3" />
@@ -432,6 +452,19 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
 
         {expandedSections.spaces && (
           <div className="mt-1 space-y-0.5">
+            {workspacesLoading && (
+              <div className="flex items-center px-2 py-1 text-xs text-gray-400">
+                <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                <span>Loading workspaces...</span>
+              </div>
+            )}
+
+            {workspacesError && (
+              <div className="px-2 py-1 text-xs text-red-500">
+                Failed to load workspaces: {workspacesError}
+              </div>
+            )}
+
             {spacesLoading && (
               <div className="flex items-center px-2 py-1 text-xs text-gray-400">
                 <Loader2 className="h-3 w-3 mr-2 animate-spin" />
@@ -441,7 +474,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
 
             {spacesError && (
               <div className="px-2 py-1 text-xs text-red-500">
-                Failed to load spaces
+                Failed to load spaces: {spacesError}
               </div>
             )}
 
@@ -473,6 +506,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                     onClick={(e) => {
                       e.stopPropagation();
                       // Handle more options click here
+                      console.log('Space options for:', space.name);
                     }}
                   >
                     <MoreHorizontal className="h-3 w-3" />
@@ -486,6 +520,12 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                       <div className="flex items-center px-2 py-0.5 text-xs text-gray-400">
                         <Loader2 className="h-3 w-3 mr-2 animate-spin" />
                         <span>Loading lists...</span>
+                      </div>
+                    )}
+
+                    {listsError && selectedSpace?.id === space.id && (
+                      <div className="px-2 py-0.5 text-xs text-red-500">
+                        Failed to load lists: {listsError}
                       </div>
                     )}
 
@@ -505,7 +545,10 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                           <span className="truncate text-left">{list.name}</span>
                         </button>
                       ))}
-                    <button className="flex items-center px-2 py-0.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors w-full">
+                    <button 
+                      className="flex items-center px-2 py-0.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors w-full"
+                      onClick={() => console.log('Add new list to space:', space.name)}
+                    >
                       <Plus className="h-3 w-3 mr-2" />
                       <span>Add List</span>
                     </button>
@@ -516,7 +559,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
 
             {!spacesLoading && spaces && spaces.length === 0 && (
               <div className="px-2 py-2 text-xs text-gray-400 dark:text-gray-500">
-                No spaces yet
+                No spaces yet. Create your first space to get started.
               </div>
             )}
           </div>
