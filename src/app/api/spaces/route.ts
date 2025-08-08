@@ -9,7 +9,7 @@ const createSpaceSchema = z.object({
   description: z.string().optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
-  isPrivate: z.boolean().default(false),
+  private: z.boolean().default(false),
   workspaceId: z.string(),
 })
 
@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
       where: {
         workspaceId,
         OR: [
-          { isPrivate: false },
+          { private: false },
           // Include private spaces if user has access
-          { isPrivate: true }
+          { private: true }
         ]
       },
       include: {
@@ -96,7 +96,10 @@ export async function POST(request: NextRequest) {
     }
 
     const space = await prisma.space.create({
-      data: validatedData,
+      data: {
+        ...validatedData,
+        createdById: session.user.id
+      },
       include: {
         _count: {
           select: {

@@ -13,10 +13,10 @@ const createTaskSchema = z.object({
   dueDate: z.string().optional(),
   listId: z.string(),
   assigneeId: z.string().optional(),
-  parentId: z.string().optional(),
+  parentTaskId: z.string().optional(),
 })
 
-const updateTaskSchema = createTaskSchema.partial().omit({ listId: true })
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
     const tasks = await prisma.task.findMany({
       where: whereClause,
       include: {
-        creator: {
+        createdBy: {
           select: {
             id: true,
             name: true,
@@ -128,7 +128,13 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 name: true,
-                color: true
+                color: true,
+                workspace: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
               }
             }
           }
@@ -138,16 +144,6 @@ export async function GET(request: NextRequest) {
             subtasks: true,
             comments: true,
             attachments: true
-          }
-        },
-        customFieldValues: {
-          include: {
-            customField: true
-          }
-        },
-        tags: {
-          include: {
-            tag: true
           }
         }
       },
@@ -177,340 +173,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = createTaskSchema.parse(body)
 
-    // Check if user has access to the list
-    const list = await prisma.list.findFirst({
-      where: {
-        id: validatedData.listId,
-        space: {
-          workspace: {
-            members: {
-              some: {
-                userId: session.user.id,
-                role: {
-                  not: 'GUEST'
-                }
-              }
-            }
-          }
-        }
-      }
-    })
-
-    if (!list) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // If assigneeId is provided, check if assignee has access to workspace
-    if (validatedData.assigneeId) {
-      const assigneeAccess = await prisma.workspaceMember.findFirst({
+    // Use transaction for data consistency
+    const task = await prisma.$transaction(async (tx) => {
+      // Check if user has access to the list
+      const list = await tx.list.findFirst({
         where: {
-          userId: validatedData.assigneeId,
-          workspace: {
-            spaces: {
-              some: {
-                lists: {
-                  some: {
-                    id: validatedData.listId
-                  }
-                }
-              }
-            }
-          }
-        }
-      })
-
-      if (!assigneeAccess) {
-        return NextResponse.json(
-          { error: 'Assignee does not have access to this workspace' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Get the highest position for ordering
-    const lastTask = await prisma.task.findFirst({
-      where: { listId: validatedData.listId },
-      orderBy: { position: 'desc' }
-    })
-
-    const taskData = {
-      ...validatedData,
-      position: (lastTask?.position || 0) + 1,
-      creatorId: session.user.id,
-      startDate: validatedData.startDate ? new Date(validatedData.startDate) : undefined,
-      dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : undefined,
-    }
-
-    const task = await prisma.task.create({
-      data: taskData,
-      include: {
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true
-          }
-        },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true
-          }
-        },
-        list: {
-          select: {
-            id: true,
-            name: true,
-            color: true,
-            space: {
-              select: {
-                id: true,
-                name: true,
-                color: true
-              }
-            }
-          }
-        },
-        _count: {
-          select: {
-            subtasks: true,
-            comments: true,
-            attachments: true
-          }
-        }
-      }
-    })
-
-    // Create activity log
-    await prisma.activity.create({
-      data: {
-        type: 'TASK_CREATED',
-        message: `Created task "${task.name}"`,
-        taskId: task.id,
-        userId: session.user.id,
-        data: {
-          taskName: task.name,
-          listName: task.list.name
-        }
-      }
-    })
-
-    return NextResponse.json(task)
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Validation error', details: error.errors },
-        { status: 400 }
-      )
-    }
-
-    console.error('Error creating task:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { searchParams } = new URL(request.url)
-    const taskId = searchParams.get('id')
-
-    if (!taskId) {
-      return NextResponse.json(
-        { error: 'Task ID is required' },
-        { status: 400 }
-      )
-    }
-
-    const body = await request.json()
-    const validatedData = updateTaskSchema.parse(body)
-
-    // Check if user has access to the task
-    const existingTask = await prisma.task.findFirst({
-      where: {
-        id: taskId,
-        list: {
-          space: {
-            workspace: {
-              members: {
-                some: {
-                  userId: session.user.id
-                }
-              }
-            }
-          }
-        }
-      },
-      include: {
-        list: true
-      }
-    })
-
-    if (!existingTask) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
-
-    // Check if assigneeId is valid if provided
-    if (validatedData.assigneeId) {
-      const assigneeAccess = await prisma.workspaceMember.findFirst({
-        where: {
-          userId: validatedData.assigneeId,
-          workspace: {
-            spaces: {
-              some: {
-                lists: {
-                  some: {
-                    id: existingTask.listId
-                  }
-                }
-              }
-            }
-          }
-        }
-      })
-
-      if (!assigneeAccess) {
-        return NextResponse.json(
-          { error: 'Assignee does not have access to this workspace' },
-          { status: 400 }
-        )
-      }
-    }
-
-    const updateData = {
-      ...validatedData,
-      startDate: validatedData.startDate ? new Date(validatedData.startDate) : undefined,
-      dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : undefined,
-      completedAt: validatedData.status === 'DONE' && existingTask.status !== 'DONE' 
-        ? new Date() 
-        : validatedData.status !== 'DONE' ? null : undefined
-    }
-
-    const task = await prisma.task.update({
-      where: { id: taskId },
-      data: updateData,
-      include: {
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true
-          }
-        },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true
-          }
-        },
-        list: {
-          select: {
-            id: true,
-            name: true,
-            color: true,
-            space: {
-              select: {
-                id: true,
-                name: true,
-                color: true
-              }
-            }
-          }
-        },
-        _count: {
-          select: {
-            subtasks: true,
-            comments: true,
-            attachments: true
-          }
-        }
-      }
-    })
-
-    // Create activity log for significant changes
-    if (validatedData.status && validatedData.status !== existingTask.status) {
-      await prisma.activity.create({
-        data: {
-          type: validatedData.status === 'DONE' ? 'TASK_COMPLETED' : 'TASK_UPDATED',
-          message: `Changed task status to "${validatedData.status}"`,
-          taskId: task.id,
-          userId: session.user.id,
-          data: {
-            taskName: task.name,
-            oldStatus: existingTask.status,
-            newStatus: validatedData.status
-          }
-        }
-      })
-    }
-
-    if (validatedData.assigneeId && validatedData.assigneeId !== existingTask.assigneeId) {
-      await prisma.activity.create({
-        data: {
-          type: 'TASK_ASSIGNED',
-          message: `Assigned task to ${task.assignee?.name}`,
-          taskId: task.id,
-          userId: session.user.id,
-          data: {
-            taskName: task.name,
-            assigneeId: validatedData.assigneeId
-          }
-        }
-      })
-    }
-
-    return NextResponse.json(task)
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Validation error', details: error.errors },
-        { status: 400 }
-      )
-    }
-
-    console.error('Error updating task:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { searchParams } = new URL(request.url)
-    const taskId = searchParams.get('id')
-
-    if (!taskId) {
-      return NextResponse.json(
-        { error: 'Task ID is required' },
-        { status: 400 }
-      )
-    }
-
-    // Check if user has access to the task
-    const task = await prisma.task.findFirst({
-      where: {
-        id: taskId,
-        list: {
+          id: validatedData.listId,
           space: {
             workspace: {
               members: {
@@ -524,23 +192,144 @@ export async function DELETE(request: NextRequest) {
             }
           }
         }
+      })
+
+      if (!list) {
+        throw new Error('Access denied to this list')
       }
+
+      // Validate assignee if provided
+      if (validatedData.assigneeId) {
+        const assigneeAccess = await tx.workspaceMember.findFirst({
+          where: {
+            userId: validatedData.assigneeId,
+            workspace: {
+              spaces: {
+                some: {
+                  lists: {
+                    some: {
+                      id: validatedData.listId
+                    }
+                  }
+                }
+              }
+            }
+          }
+        })
+
+        if (!assigneeAccess) {
+          throw new Error('Assignee does not have access to this workspace')
+        }
+      }
+
+      // Validate parent task if provided
+      if (validatedData.parentTaskId) {
+        const parentTask = await tx.task.findFirst({
+          where: {
+            id: validatedData.parentTaskId,
+            listId: validatedData.listId
+          }
+        })
+
+        if (!parentTask) {
+          throw new Error('Parent task not found or not in the same list')
+        }
+      }
+
+      // Get the highest position for ordering
+      const lastTask = await tx.task.findFirst({
+        where: { listId: validatedData.listId },
+        orderBy: { position: 'desc' }
+      })
+
+      // Prepare task data
+      const taskData = {
+        ...validatedData,
+        position: (lastTask?.position || 0) + 1,
+        createdById: session.user.id,
+        startDate: validatedData.startDate ? new Date(validatedData.startDate) : undefined,
+        dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : undefined,
+      }
+
+      // Create the task
+      const newTask = await tx.task.create({
+        data: taskData,
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true
+            }
+          },
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true
+            }
+          },
+          list: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+              space: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true
+                }
+              }
+            }
+          },
+          _count: {
+            select: {
+              subtasks: true,
+              comments: true,
+              attachments: true
+            }
+          }
+        }
+      })
+
+      // Create activity log
+      await tx.activity.create({
+        data: {
+          type: 'TASK_CREATED',
+          message: `Created task "${newTask.name}"`,
+          taskId: newTask.id,
+          userId: session.user.id,
+          data: {
+            taskName: newTask.name,
+            listName: newTask.list.name
+          }
+        }
+      })
+
+      return newTask
     })
 
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    return NextResponse.json(task)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.errors },
+        { status: 400 }
+      )
     }
 
-    await prisma.task.delete({
-      where: { id: taskId }
-    })
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting task:', error)
+    console.error('Error creating task:', error)
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    const status = message.includes('Access denied') ? 403 : 
+                   message.includes('does not have access') || message.includes('not found') ? 400 : 500
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: message },
+      { status }
     )
   }
 }
+

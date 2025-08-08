@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const lists = await prisma.list.findMany({
       where: {
         spaceId,
-        isArchived: false
+        archived: false
       },
       include: {
         _count: {
@@ -119,7 +119,8 @@ export async function POST(request: NextRequest) {
     const list = await prisma.list.create({
       data: {
         ...validatedData,
-        position: (lastList?.position || 0) + 1
+        position: (lastList?.position || 0) + 1,
+        createdById: session.user.id
       },
       include: {
         _count: {
