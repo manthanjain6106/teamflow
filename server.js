@@ -5,6 +5,9 @@ const next = require('next');
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
+// Compute app public URL: prefer NEXTAUTH_URL, then VERCEL_URL, else localhost
+const publicUrl = process.env.NEXTAUTH_URL
+  || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${port}`);
 
 // Create Next.js app
 const app = next({ dev, hostname, port });
@@ -16,9 +19,7 @@ app.prepare().then(() => {
   // Create Socket.IO server
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.NODE_ENV === 'production' 
-        ? process.env.NEXTAUTH_URL 
-        : "http://localhost:3000",
+      origin: publicUrl,
       methods: ["GET", "POST"]
     }
   });
@@ -118,7 +119,7 @@ app.prepare().then(() => {
       process.exit(1);
     })
     .listen(port, () => {
-      console.log(`> Ready on http://${hostname}:${port}`);
+      console.log(`> Ready on ${publicUrl}`);
       console.log(`> Socket.IO server running on port ${port}`);
     });
 });
