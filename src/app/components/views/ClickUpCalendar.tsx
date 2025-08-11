@@ -22,7 +22,7 @@ interface Task {
   id: string;
   name: string;
   description?: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELED';
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE' | 'CANCELLED';
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
   dueDate?: string;
   startDate?: string;
@@ -54,7 +54,7 @@ const ClickUpCalendar: React.FC = () => {
       const response = await fetch('/api/tasks');
       if (response.ok) {
         const data = await response.json();
-        setTasks(data.tasks || []);
+        setTasks(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -114,8 +114,9 @@ const ClickUpCalendar: React.FC = () => {
     switch (status) {
       case 'DONE': return 'bg-green-500';
       case 'IN_PROGRESS': return 'bg-yellow-500';
-      case 'OPEN': return 'bg-blue-500';
-      case 'CANCELED': return 'bg-gray-500';
+      case 'IN_REVIEW': return 'bg-purple-500';
+      case 'TODO': return 'bg-blue-500';
+      case 'CANCELLED': return 'bg-gray-500';
       default: return 'bg-gray-500';
     }
   };

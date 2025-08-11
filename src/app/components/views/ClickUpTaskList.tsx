@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import WorkingTaskModal from '@/app/components/ui/WorkingTaskModal';
 import { useStore } from '@/store/useStore';
 import { useTasks } from '@/hooks/useData';
 import { createTask, updateTask, deleteTask } from '@/lib/api';
@@ -38,6 +39,8 @@ export default function ClickUpTaskList({ listId, spaceId }: ClickUpTaskListProp
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
   const [newTaskName, setNewTaskName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -407,9 +410,15 @@ export default function ClickUpTaskList({ listId, spaceId }: ClickUpTaskListProp
                         {/* Task Name */}
                         <div className="flex-1 flex items-center space-x-2">
                           {getPriorityIcon(task.priority)}
-                          <span className="text-gray-900 dark:text-white font-medium">
+                          <button
+                            onClick={() => {
+                              setSelectedTask(task);
+                              setShowTaskModal(true);
+                            }}
+                            className="text-left text-gray-900 dark:text-white font-medium hover:text-purple-600 dark:hover:text-purple-400"
+                          >
                             {task.name}
-                          </span>
+                          </button>
                           {task.description && (
                             <span className="text-xs text-gray-500">
                               {task.description.substring(0, 50)}...
@@ -524,6 +533,22 @@ export default function ClickUpTaskList({ listId, spaceId }: ClickUpTaskListProp
           ))
         )}
       </div>
+      {/* Task Edit/Create Modal */}
+      {showTaskModal && (
+        <WorkingTaskModal
+          task={selectedTask}
+          isOpen={showTaskModal}
+          onClose={() => {
+            setShowTaskModal(false);
+            setSelectedTask(null);
+          }}
+          onSave={() => {
+            refetch();
+            setShowTaskModal(false);
+            setSelectedTask(null);
+          }}
+        />
+      )}
     </div>
   );
 }

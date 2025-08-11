@@ -28,7 +28,8 @@ model User {
   createdTasks        Task[]            @relation("TaskCreator")
   assignedTasks       Task[]            @relation("TaskAssignee")
   taskComments        TaskComment[]
-  taskShares          TaskShare[]
+  sharesGiven         TaskShare[] @relation("TaskSharesSharedBy")
+  sharesReceived      TaskShare[] @relation("TaskSharesReceivedBy")
   taskAttachments     TaskAttachment[]
   timeEntries         TimeEntry[]
   goals               Goal[]
@@ -36,6 +37,7 @@ model User {
   documentFolders     DocumentFolder[]
   notifications       Notification[]
   activities          Activity[]
+  invitationsSent     Invitation[]    @relation("InvitationsByUser")
 
   @@map("users")
 }
@@ -97,6 +99,9 @@ model Workspace {
   members   WorkspaceMember[]
   spaces    Space[]
   goals     Goal[]
+  documents Document[]
+  documentFolders DocumentFolder[]
+  invitations     Invitation[]        @relation("InvitationsForWorkspace")
 
   @@map("workspaces")
 }
@@ -114,6 +119,23 @@ model WorkspaceMember {
 
   @@unique([workspaceId, userId])
   @@map("workspace_members")
+}
+
+model Invitation {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String
+  role         WorkspaceRole @default(MEMBER)
+  token        String   @unique
+  status       String   @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+  invitedById  String   @db.ObjectId
+  workspaceId  String   @db.ObjectId
+
+  invitedBy    User      @relation("InvitationsByUser", fields: [invitedById], references: [id])
+  workspace    Workspace @relation("InvitationsForWorkspace", fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("invitations")
 }
 
 model Space {
@@ -235,12 +257,15 @@ model TaskShare {
   createdAt DateTime @default(now())
   taskId    String   @db.ObjectId
   sharedById String  @db.ObjectId
+  userId     String  @db.ObjectId
 
   // Relationships
   task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  sharedBy User @relation(fields: [sharedById], references: [id])
+  sharedBy User @relation("TaskSharesSharedBy", fields: [sharedById], references: [id])
+  user     User @relation("TaskSharesReceivedBy", fields: [userId], references: [id])
 
   @@map("task_shares")
+  @@unique([taskId, userId])
 }
 
 model TimeEntry {
@@ -285,6 +310,8 @@ model DocumentFolder {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   path        String
+  color       String?
+  workspaceId String   @db.ObjectId
   parentId    String?  @db.ObjectId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -295,6 +322,7 @@ model DocumentFolder {
   parent    DocumentFolder? @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children  DocumentFolder[] @relation("FolderHierarchy")
   documents Document[]
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@map("document_folders")
 }
@@ -305,14 +333,17 @@ model Document {
   content     String
   version     Int      @default(1)
   isPublic    Boolean  @default(false)
+  starred     Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   folderId    String?  @db.ObjectId
+  workspaceId String   @db.ObjectId
   createdById String   @db.ObjectId
 
   // Relationships
   folder    DocumentFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   createdBy User            @relation(fields: [createdById], references: [id])
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@map("documents")
 }
@@ -347,6 +378,20 @@ model Activity {
   task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   @@map("activities")
+}
+
+// Global search index entries
+model SearchIndex {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  entityId    String   @unique
+  title       String
+  content     String
+  type        String
+  workspaceId String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("search_index")
 }
 
 // Enums

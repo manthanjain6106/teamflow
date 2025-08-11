@@ -22,7 +22,7 @@ interface Task {
   id: string;
   name: string;
   description?: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELED';
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE' | 'CANCELLED';
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
   dueDate?: string;
   startDate?: string;
@@ -47,7 +47,7 @@ const ClickUpTimeline: React.FC = () => {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timelineView, setTimelineView] = useState<'day' | 'week' | 'month'>('week');
-  const [statusFilter, setStatusFilter] = useState<string[]>(['OPEN', 'IN_PROGRESS']);
+  const [statusFilter, setStatusFilter] = useState<string[]>(['TODO', 'IN_PROGRESS']);
 
   // Fetch tasks from API
   const fetchTasks = async () => {
@@ -56,7 +56,7 @@ const ClickUpTimeline: React.FC = () => {
       const response = await fetch('/api/tasks');
       if (response.ok) {
         const data = await response.json();
-        setTasks(data.tasks || []);
+        setTasks(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Error fetching tasks:', error);

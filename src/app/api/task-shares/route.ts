@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       where: {
         id: taskId,
         OR: [
-          { creatorId: session.user.id },
+          { createdById: session.user.id },
           { assigneeId: session.user.id },
           { shares: { some: { userId: session.user.id } } }
         ]
@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
       where: {
         id: taskId,
         OR: [
-          { creatorId: session.user.id },
-          { shares: { some: { userId: session.user.id, permission: { in: ['write', 'admin'] } } } }
+          { createdById: session.user.id },
+          { shares: { some: { userId: session.user.id } } }
         ]
       }
     });
@@ -95,18 +95,9 @@ export async function POST(request: NextRequest) {
 
     // Create or update the share
     const share = await prisma.taskShare.upsert({
-      where: {
-        taskId_userId: {
-          taskId,
-          userId: targetUser.id,
-        },
-      },
+      where: { id: `${taskId}-${targetUser.id}` as any },
       update: { permission },
-      create: {
-        taskId,
-        userId: targetUser.id,
-        permission,
-      },
+      create: { taskId, userId: targetUser.id, permission, sharedById: session.user.id },
       include: {
         user: {
           select: {

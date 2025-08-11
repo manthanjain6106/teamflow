@@ -125,3 +125,49 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Space ID is required' },
+        { status: 400 }
+      )
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const space = await tx.space.findFirst({
+        where: {
+          id,
+          workspace: {
+            members: {
+              some: {
+                userId: session.user.id,
+                role: { not: 'GUEST' }
+              }
+            }
+          }
+        }
+      })
+
+      if (!space) {
+        throw new Error('Space not found or access denied')
+      }
+
+      await tx.space.delete({ where: { id } })
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    const status = message.includes('not found') || message.includes('denied') ? 404 : 500
+    return NextResponse.json({ error: message }, { status })
+  }
+}

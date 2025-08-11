@@ -16,6 +16,41 @@ export async function fetchWorkspaces() {
   return response.json();
 }
 
+export async function fetchWorkspaceMembers(workspaceId: string) {
+  const res = await fetch(`/api/workspaces/${workspaceId}/members`)
+  if (!res.ok) throw new Error('Failed to fetch members')
+  return res.json()
+}
+
+export async function addWorkspaceMember(workspaceId: string, email: string, role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'GUEST' = 'MEMBER') {
+  const res = await fetch(`/api/workspaces/${workspaceId}/members`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, role })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Failed to add member')
+  }
+  return res.json()
+}
+
+export async function updateWorkspaceMemberRole(workspaceId: string, userId: string, role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'GUEST') {
+  const res = await fetch(`/api/workspaces/${workspaceId}/members`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, role })
+  })
+  if (!res.ok) throw new Error('Failed to update role')
+  return res.json()
+}
+
+export async function removeWorkspaceMember(workspaceId: string, userId: string) {
+  const res = await fetch(`/api/workspaces/${workspaceId}/members?userId=${userId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to remove member')
+  return res.json()
+}
+
 export async function fetchSpaces(workspaceId: string) {
   const response = await fetch(`/api/spaces?workspaceId=${workspaceId}`);
   if (!response.ok) {
@@ -88,6 +123,12 @@ export async function createSpace(data: {
   return response.json();
 }
 
+export async function deleteSpace(id: string) {
+  const response = await fetch(`/api/spaces?id=${id}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error('Failed to delete space');
+  return response.json();
+}
+
 export async function createList(data: {
   name: string;
   description?: string;
@@ -103,6 +144,12 @@ export async function createList(data: {
   if (!response.ok) {
     throw new Error('Failed to create list');
   }
+  return response.json();
+}
+
+export async function deleteList(id: string) {
+  const response = await fetch(`/api/lists?id=${id}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error('Failed to delete list');
   return response.json();
 }
 

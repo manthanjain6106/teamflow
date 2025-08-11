@@ -50,9 +50,11 @@ export const useSocket = (): UseSocketReturn => {
   useEffect(() => {
     if (!session?.user?.id) return
 
-    const socketInstance = io(process.env.NODE_ENV === 'production' 
-      ? 'wss://your-domain.com' // Replace with your production WebSocket URL
-      : 'ws://localhost:3000', {
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' 
+      ? (process.env.NEXT_PUBLIC_BASE_URL || '')
+      : 'http://localhost:3000')
+
+    const socketInstance = io(socketUrl, {
       transports: ['websocket', 'polling'],
       upgrade: true,
       forceNew: true

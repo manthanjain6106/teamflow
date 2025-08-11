@@ -6,7 +6,8 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useStore } from '@/store/useStore';
 import { useWorkspaces, useSpaces, useLists } from '@/hooks/useData';
-import { createWorkspace, createSpace, createList } from '@/lib/api';
+import { createWorkspace, createSpace, createList, deleteList, deleteSpace, addWorkspaceMember } from '@/lib/api';
+import WorkspaceMembersModal from '@/app/components/ui/WorkspaceMembersModal';
 import {
   ChevronDown,
   ChevronRight,
@@ -71,6 +72,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
 
   const [hoverSection, setHoverSection] = useState<string | null>(null);
   const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({});
+  const [showMembersModal, setShowMembersModal] = useState(false);
 
   // Fetch real data
   const { workspaces, loading: workspacesLoading, error: workspacesError } = useWorkspaces();
@@ -146,8 +148,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
       href: '/app/inbox',
       icon: Inbox,
       active: pathname === '/app/inbox',
-      color: 'text-green-600',
-      badge: 3
+      color: 'text-green-600'
     },
     {
       name: 'Docs',
@@ -172,21 +173,8 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
     }
   ];
 
-  // Mock favorites for now - in real app, these would be user-specific
-  const favorites = [
-    {
-      name: 'Marketing Campaign',
-      href: '/app/spaces/marketing',
-      icon: Zap,
-      color: '#f59e0b'
-    },
-    {
-      name: 'Product Roadmap',
-      href: '/app/spaces/product',
-      icon: TrendingUp,
-      color: '#3b82f6'
-    }
-  ];
+  // Favorites hidden until backed by real data
+  const favorites: Array<{ name: string; href: string; icon: any; color: string }> = [];
 
   // Everything section items
   const everything = [
@@ -194,25 +182,21 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
       name: 'Assigned to me',
       href: '/app/assigned',
       icon: CheckSquare2,
-      count: 12
     },
     {
       name: 'Created by me',
       href: '/app/created',
-      icon: Plus,
-      count: 8
+      icon: Plus
     },
     {
       name: 'Watching',
       href: '/app/watching',
-      icon: Eye,
-      count: 25
+      icon: Eye
     },
     {
       name: 'Recently viewed',
       href: '/app/recent',
-      icon: Clock,
-      count: 15
+      icon: Clock
     },
     {
       name: 'Time tracking',
@@ -311,8 +295,15 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
           </div>
         </div>
         <div className="flex items-center space-x-1">
-          <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors">
-            <Search className="h-3 w-3 text-gray-500" />
+          <button
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+            onClick={async () => {
+              if (!selectedWorkspace?.id) return alert('Select a workspace first');
+              setShowMembersModal(true);
+            }}
+            title="Manage members"
+          >
+            <Users className="h-3 w-3 text-gray-500" />
           </button>
           <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors relative">
             <Bell className="h-3 w-3 text-gray-500" />
@@ -320,6 +311,13 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
           </button>
         </div>
       </div>
+      {selectedWorkspace?.id && (
+        <WorkspaceMembersModal
+          workspaceId={selectedWorkspace.id}
+          open={showMembersModal}
+          onClose={() => setShowMembersModal(false)}
+        />
+      )}
 
       {/* Search Bar */}
       <div className="p-3 border-b border-gray-200 dark:border-gray-700">
@@ -365,7 +363,8 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
         ))}
       </div>
 
-      {/* Favorites */}
+      {/* Favorites (render only if real data available) */}
+      {favorites.length > 0 && (
       <div className="px-2 py-2 border-b border-gray-200 dark:border-gray-700">
         <div
           onMouseEnter={() => setHoverSection('favorites')}
@@ -417,6 +416,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
           </div>
         )}
       </div>
+      )}
 
       {/* Spaces */}
       <div className="flex-1 px-2 py-2 overflow-y-auto">
@@ -501,16 +501,28 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                     <FolderOpen className="h-3 w-3 mr-2" />
                     <span className="flex-1 truncate text-left">{space.name}</span>
                   </button>
-                  <button 
-                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded flex-shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Handle more options click here
-                      console.log('Space options for:', space.name);
-                    }}
-                  >
-                    <MoreHorizontal className="h-3 w-3" />
-                  </button>
+                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+                    <button 
+                      className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded flex-shrink-0"
+                      title="Delete space"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete space "${space.name}"? All lists and tasks inside may be removed.`)) {
+                          try {
+                            await deleteSpace(space.id);
+                            window.location.reload();
+                          } catch (err) {
+                            alert(err instanceof Error ? err.message : 'Failed to delete space');
+                          }
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                    <button className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded flex-shrink-0">
+                      <MoreHorizontal className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Lists under space */}
@@ -543,6 +555,23 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                         >
                           <Hash className="h-3 w-3 mr-2" />
                           <span className="truncate text-left">{list.name}</span>
+                          <button
+                            className="ml-auto p-0.5 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                            title="Delete list"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm(`Delete list "${list.name}"?`)) {
+                                try {
+                                  await deleteList(list.id);
+                                  window.location.reload();
+                                } catch (err) {
+                                  alert(err instanceof Error ? err.message : 'Failed to delete list');
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
                         </button>
                       ))}
                     <button 
@@ -593,11 +622,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                     <item.icon className="h-3 w-3 mr-2.5" />
                     <span>{item.name}</span>
                   </div>
-                  {item.count && (
-                    <span className="text-xs text-gray-400">
-                      {item.count}
-                    </span>
-                  )}
+                  {/* Counts removed until backed by real data */}
                 </Link>
               ))}
             </div>

@@ -23,6 +23,7 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [isMac, setIsMac] = useState(false);
   const router = useRouter();
 
   // Handle Cmd+K / Ctrl+K shortcut
@@ -42,10 +43,8 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      
-      // Check if click is outside all menu areas
-      const isOutsideMenus = !target.closest('[data-menu]');
-      
+      // Treat both dropdowns and their triggers as menu areas
+      const isOutsideMenus = !target.closest('[data-menu]') && !target.closest('[data-menu-trigger]');
       if (isOutsideMenus) {
         setShowUserMenu(false);
         setShowNotifications(false);
@@ -56,6 +55,14 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
 
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Detect platform on client to avoid SSR navigator reference
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') {
+      const platform = (navigator as any).userAgentData?.platform || navigator.platform || '';
+      setIsMac(/Mac|iPhone|iPad|iPod/.test(platform));
+    }
   }, []);
 
   // Generate page title and breadcrumbs
@@ -134,36 +141,60 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
     setShowCreateMenu(false);
   };
 
-  const handleCreateItem = (type: string) => {
-    console.log(`Creating new ${type}`);
+  const handleCreateItem = async (type: string) => {
     setShowCreateMenu(false);
-    
-    // Here you would typically open a modal or navigate to create page
-    switch (type) {
-      case 'task':
-        // Open task creation modal
-        console.log('Open task creation modal');
-        break;
-      case 'list':
-        // Open list creation modal
-        console.log('Open list creation modal');
-        break;
-      case 'space':
-        // Open space creation modal
-        console.log('Open space creation modal');
-        break;
-      case 'workspace':
-        // Navigate to workspace creation
-        console.log('Navigate to workspace creation');
-        break;
-      case 'document':
-        // Open document creation
-        console.log('Open document creation');
-        break;
-      case 'goal':
-        // Open goal creation
-        console.log('Open goal creation');
-        break;
+    try {
+      if (type === 'task') {
+        const { setCurrentView } = useStore.getState();
+        setCurrentView('TABLE');
+        const event = new CustomEvent('openCreateTask');
+        window.dispatchEvent(event);
+        return;
+      }
+
+      if (type === 'list') {
+        const { selectedSpace } = useStore.getState();
+        if (!selectedSpace?.id) return alert('Select a space first');
+        const name = prompt('List name');
+        if (!name) return;
+        const { createList } = await import('@/lib/api');
+        await createList({ name, spaceId: selectedSpace.id });
+        location.reload();
+        return;
+      }
+
+      if (type === 'space') {
+        const { selectedWorkspace } = useStore.getState();
+        if (!selectedWorkspace?.id) return alert('Select a workspace first');
+        const name = prompt('Space name');
+        if (!name) return;
+        const { createSpace } = await import('@/lib/api');
+        await createSpace({ name, workspaceId: selectedWorkspace.id });
+        location.reload();
+        return;
+      }
+
+      if (type === 'workspace') {
+        const name = prompt('Workspace name');
+        if (!name) return;
+        const slug = prompt('Workspace slug (lowercase, hyphens)') || name.toLowerCase().replace(/\s+/g, '-');
+        const { createWorkspace } = await import('@/lib/api');
+        await createWorkspace({ name, slug });
+        location.reload();
+        return;
+      }
+
+      if (type === 'document') {
+        alert('Documents create UI coming soon.');
+        return;
+      }
+
+      if (type === 'goal') {
+        alert('Goals create UI coming soon.');
+        return;
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create');
     }
   };
 
@@ -198,7 +229,7 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
             <span className="flex-1 text-left">Search tasks, docs, goals...</span>
             <div className="flex items-center space-x-1">
               <kbd className="px-1.5 py-0.5 text-xs bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded">
-                {navigator.platform.indexOf('Mac') !== -1 ? '⌘' : 'Ctrl'}
+                {isMac ? '⌘' : 'Ctrl'}
               </kbd>
               <kbd className="px-1.5 py-0.5 text-xs bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded">
                 K
@@ -296,6 +327,7 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
           <button 
             onClick={handlePlusClick}
             className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors relative group"
+            data-menu-trigger
             title="Create new item"
           >
             <Plus className="h-5 w-5" />
@@ -305,6 +337,7 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
           <button 
             onClick={handleBellClick}
             className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors relative"
+            data-menu-trigger
             title="Notifications"
           >
             <Bell className="h-5 w-5" />
@@ -322,6 +355,7 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
           <button 
             onClick={handleMoreClick}
             className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            data-menu-trigger
             title="More options"
           >
             <MoreHorizontal className="h-5 w-5" />
@@ -331,6 +365,7 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
           <button
             onClick={handleUserClick}
             className="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-medium hover:bg-purple-700 transition-colors"
+            data-menu-trigger
             title="User menu"
           >
             <User className="h-4 w-4" />

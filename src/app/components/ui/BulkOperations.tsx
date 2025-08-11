@@ -50,10 +50,10 @@ export default function BulkOperations({
   };
 
   const statusOptions = [
-    { value: 'OPEN', label: 'Open', color: 'bg-gray-100 text-gray-800' },
+  { value: 'TODO', label: 'To do', color: 'bg-gray-100 text-gray-800' },
     { value: 'IN_PROGRESS', label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
     { value: 'DONE', label: 'Done', color: 'bg-green-100 text-green-800' },
-    { value: 'CANCELED', label: 'Canceled', color: 'bg-red-100 text-red-800' }
+  { value: 'CANCELLED', label: 'Cancelled', color: 'bg-red-100 text-red-800' }
   ];
 
   const priorityOptions = [

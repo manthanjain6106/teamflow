@@ -23,14 +23,7 @@ export async function GET(request: NextRequest) {
     const workspace = await prisma.workspace.findFirst({
       where: {
         id: workspaceId,
-        OR: [
-          { creatorId: session.user.id },
-          { 
-            members: {
-              some: { userId: session.user.id }
-            }
-          }
-        ]
+        members: { some: { userId: session.user.id } }
       }
     });
 
@@ -53,15 +46,7 @@ export async function GET(request: NextRequest) {
             { name: { contains: query, mode: 'insensitive' } },
             { description: { contains: query, mode: 'insensitive' } },
           ],
-          AND: [
-            {
-              OR: [
-                { creatorId: session.user.id },
-                { assigneeId: session.user.id },
-                { shares: { some: { userId: session.user.id } } }
-              ]
-            }
-          ]
+          AND: [{ list: { space: { workspace: { members: { some: { userId: session.user.id } } } } } }]
         },
         include: {
           list: {
@@ -115,14 +100,7 @@ export async function GET(request: NextRequest) {
             { title: { contains: query, mode: 'insensitive' } },
             { content: { contains: query, mode: 'insensitive' } },
           ],
-          AND: [
-            {
-              OR: [
-                { createdById: session.user.id },
-                { shares: { some: { userId: session.user.id } } }
-              ]
-            }
-          ]
+          AND: [{ workspace: { members: { some: { userId: session.user.id } } } }]
         },
         include: {
           createdBy: {
@@ -198,7 +176,7 @@ export async function GET(request: NextRequest) {
 
     // Search comments
     if (!type || type === 'all' || type === 'comment') {
-      const comments = await prisma.comment.findMany({
+      const comments = await prisma.taskComment.findMany({
         where: {
           content: { contains: query, mode: 'insensitive' },
           task: {

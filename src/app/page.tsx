@@ -63,12 +63,7 @@ export default function Home() {
               <span>Start for Free</span>
               <ArrowRight className="h-5 w-5" />
             </Link>
-            <Link
-              href="/auth/signin"
-              className="px-8 py-4 border-2 border-purple-600 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg font-semibold text-lg transition-colors"
-            >
-              Demo Account
-            </Link>
+            {/* Demo CTA removed for production */}
           </div>
 
           {/* Demo Preview */}

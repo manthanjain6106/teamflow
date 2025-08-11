@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const attachments = await prisma.attachment.findMany({
+    const attachments = await prisma.taskAttachment.findMany({
       where: { taskId },
       orderBy: { createdAt: 'desc' },
     });
@@ -103,13 +103,14 @@ export async function POST(request: NextRequest) {
     await writeFile(filePath, buffer);
 
     // Save attachment metadata to database
-    const attachment = await prisma.attachment.create({
+    const attachment = await prisma.taskAttachment.create({
       data: {
-        fileName: originalName,
-        fileUrl: `/uploads/${fileName}`,
-        fileSize: file.size,
-        mimeType: file.type,
+        name: originalName,
+        url: `/uploads/${fileName}`,
+        size: Number(file.size),
+        type: file.type,
         taskId,
+        uploadedById: session.user.id,
       },
     });
 
@@ -157,12 +158,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Verify user has permission to delete the attachment
-    const attachment = await prisma.attachment.findFirst({
+    const attachment = await prisma.taskAttachment.findFirst({
       where: {
         id: attachmentId,
         task: {
           OR: [
-            { creatorId: session.user.id },
+            { createdById: session.user.id },
             { assigneeId: session.user.id },
             { shares: { some: { userId: session.user.id, permission: { in: ['write', 'admin'] } } } }
           ]
@@ -178,7 +179,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete attachment from database
-    await prisma.attachment.delete({
+    await prisma.taskAttachment.delete({
       where: { id: attachmentId },
     });
 
@@ -192,7 +193,7 @@ export async function DELETE(request: NextRequest) {
     await prisma.activity.create({
       data: {
         type: 'ATTACHMENT_ADDED', // We don't have ATTACHMENT_DELETED type
-        message: `Attachment "${attachment.fileName}" was removed`,
+        message: `Attachment "${attachment.name}" was removed`,
         userId: session.user.id,
         taskId: attachment.taskId,
       },

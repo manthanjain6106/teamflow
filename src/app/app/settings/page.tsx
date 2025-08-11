@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { 
   User, 
@@ -12,12 +12,17 @@ import {
   Key,
   Trash2,
   Save,
-  Camera
+  Camera,
+  Users,
+  Trash2 as Trash
 } from 'lucide-react';
+import { useStore } from '@/store/useStore';
+import { fetchWorkspaceMembers, addWorkspaceMember, updateWorkspaceMemberRole, removeWorkspaceMember } from '@/lib/api';
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState('profile');
+  const { selectedWorkspace } = useStore();
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -32,7 +37,8 @@ export default function SettingsPage() {
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'security', name: 'Security', icon: Shield },
     { id: 'appearance', name: 'Appearance', icon: Palette },
-    { id: 'integrations', name: 'Integrations', icon: Smartphone }
+    { id: 'integrations', name: 'Integrations', icon: Smartphone },
+    { id: 'members', name: 'Members & Roles', icon: Users }
   ];
 
   const handleNotificationChange = (key: string) => {
@@ -338,6 +344,164 @@ export default function SettingsPage() {
     </div>
   );
 
+  // Members & Roles
+  const [members, setMembers] = useState<Array<{ id: string; name: string | null; email: string; image?: string | null; role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'GUEST'; joinedAt: string }>>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'OWNER' | 'ADMIN' | 'MEMBER' | 'GUEST'>('MEMBER');
+  const [membersError, setMembersError] = useState<string | null>(null);
+
+  const loadMembers = async () => {
+    if (!selectedWorkspace?.id) return;
+    try {
+      setMembersLoading(true);
+      setMembersError(null);
+      const data = await fetchWorkspaceMembers(selectedWorkspace.id);
+      setMembers(data.members || []);
+    } catch (e) {
+      setMembersError(e instanceof Error ? e.message : 'Failed to load members');
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'members') {
+      loadMembers();
+    }
+  }, [activeTab, selectedWorkspace?.id]);
+
+  const handleInvite = async () => {
+    if (!selectedWorkspace?.id || !inviteEmail.trim()) return;
+    try {
+      await addWorkspaceMember(selectedWorkspace.id, inviteEmail.trim(), inviteRole);
+      setInviteEmail('');
+      await loadMembers();
+      alert('Invite sent or member added');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to invite member');
+    }
+  };
+
+  const handleChangeRole = async (userId: string, role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'GUEST') => {
+    if (!selectedWorkspace?.id) return;
+    try {
+      await updateWorkspaceMemberRole(selectedWorkspace.id, userId, role);
+      await loadMembers();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to update role');
+    }
+  };
+
+  const handleRemove = async (userId: string) => {
+    if (!selectedWorkspace?.id) return;
+    if (!confirm('Remove this member from the workspace?')) return;
+    try {
+      await removeWorkspaceMember(selectedWorkspace.id, userId);
+      await loadMembers();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to remove member');
+    }
+  };
+
+  const renderMembersTab = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Members of {selectedWorkspace?.name || 'Workspace'}</h3>
+          <p className="text-sm text-gray-500">Invite people and manage roles</p>
+        </div>
+      </div>
+
+      {/* Invite form */}
+      <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
+        <div className="flex-1 w-full">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invite by email</label>
+          <input
+            type="email"
+            placeholder="name@example.com"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+          <select
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value as any)}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          >
+            {['MEMBER','ADMIN','GUEST'].map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <button
+            onClick={handleInvite}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            disabled={!inviteEmail.trim() || !selectedWorkspace?.id}
+          >
+            Invite
+          </button>
+        </div>
+      </div>
+
+      {/* Members table */}
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Members</span>
+          {membersLoading && <span className="text-xs text-gray-500">Loading...</span>}
+        </div>
+        {membersError ? (
+          <div className="p-4 text-sm text-red-500">{membersError}</div>
+        ) : (
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {members.map((m) => (
+              <div key={m.id} className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                    {m.image ? (
+                      <img src={m.image} alt={m.name || m.email} className="w-8 h-8 rounded-full" />
+                    ) : (
+                      <span className="text-xs text-gray-700 dark:text-gray-300">{(m.name || m.email)[0]?.toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{m.name || m.email}</div>
+                    <div className="text-xs text-gray-500">{m.email}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={m.role}
+                    onChange={(e) => handleChangeRole(m.id, e.target.value as any)}
+                    className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  >
+                    {['OWNER','ADMIN','MEMBER','GUEST'].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => handleRemove(m.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                    title="Remove"
+                  >
+                    <Trash className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {(!members || members.length === 0) && (
+              <div className="p-4 text-sm text-gray-500">No members yet.</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const renderIntegrationsTab = () => (
     <div className="space-y-6">
       <div>
@@ -383,6 +547,7 @@ export default function SettingsPage() {
       case 'security': return renderSecurityTab();
       case 'appearance': return renderAppearanceTab();
       case 'integrations': return renderIntegrationsTab();
+      case 'members': return renderMembersTab();
       default: return renderProfileTab();
     }
   };

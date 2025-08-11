@@ -104,10 +104,10 @@ export default function ClickUpMindMap() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'OPEN': return '#6b7280';
+    case 'TODO': return '#6b7280';
       case 'IN_PROGRESS': return '#3b82f6';
       case 'DONE': return '#10b981';
-      case 'CANCELED': return '#ef4444';
+    case 'CANCELLED': return '#ef4444';
       default: return '#8b5cf6';
     }
   };

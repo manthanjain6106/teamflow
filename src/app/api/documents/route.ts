@@ -23,14 +23,7 @@ export async function GET(request: NextRequest) {
     const workspace = await prisma.workspace.findFirst({
       where: {
         id: workspaceId,
-        OR: [
-          { creatorId: session.user.id },
-          { 
-            members: {
-              some: { userId: session.user.id }
-            }
-          }
-        ]
+        members: { some: { userId: session.user.id } }
       }
     });
 
@@ -111,14 +104,7 @@ export async function POST(request: NextRequest) {
     const workspace = await prisma.workspace.findFirst({
       where: {
         id: workspaceId,
-        OR: [
-          { creatorId: session.user.id },
-          { 
-            members: {
-              some: { userId: session.user.id }
-            }
-          }
-        ]
+        members: { some: { userId: session.user.id } }
       }
     });
 
@@ -179,17 +165,7 @@ export async function PATCH(request: NextRequest) {
     const existingDocument = await prisma.document.findFirst({
       where: {
         id,
-        OR: [
-          { createdById: session.user.id },
-          {
-            shares: {
-              some: {
-                userId: session.user.id,
-                permission: { in: ['write', 'admin'] }
-              }
-            }
-          }
-        ]
+        createdById: session.user.id
       }
     });
 
@@ -250,17 +226,7 @@ export async function DELETE(request: NextRequest) {
     const document = await prisma.document.findFirst({
       where: {
         id,
-        OR: [
-          { createdById: session.user.id },
-          {
-            shares: {
-              some: {
-                userId: session.user.id,
-                permission: 'admin'
-              }
-            }
-          }
-        ]
+        createdById: session.user.id
       }
     });
 

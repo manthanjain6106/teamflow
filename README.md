@@ -124,7 +124,7 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 
 ### **Sign Up / Sign In**
 - Visit `/auth/signin` to access the login page
-- Choose from email/password, Google OAuth, or demo account
+- Choose from email/password or OAuth (Google/GitHub)
 - New users can register at `/auth/signup`
 
 ### **Main Application**
@@ -208,14 +208,9 @@ The application uses a comprehensive MongoDB schema with the following main mode
 - [x] API routes and validation
 
 ### **🚧 In Progress**
-- [ ] Calendar view implementation
-- [ ] Gantt chart view
-- [ ] Real-time collaboration
-- [ ] Time tracking interface
 - [ ] Advanced filtering and search
 
 ### **📋 Planned**
-- [ ] File attachments
 - [ ] Email notifications
 - [ ] Mobile app (React Native)
 - [ ] Advanced reporting

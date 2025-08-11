@@ -147,3 +147,53 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) {
+      return NextResponse.json(
+        { error: 'List ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Check access and delete
+    await prisma.$transaction(async (tx) => {
+      const list = await tx.list.findFirst({
+        where: {
+          id,
+          space: {
+            workspace: {
+              members: {
+                some: {
+                  userId: session.user.id,
+                  role: { not: 'GUEST' }
+                }
+              }
+            }
+          }
+        },
+        include: { space: true }
+      })
+
+      if (!list) {
+        throw new Error('List not found or access denied')
+      }
+
+      await tx.list.delete({ where: { id } })
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    const status = message.includes('not found') || message.includes('denied') ? 404 : 500
+    return NextResponse.json({ error: message }, { status })
+  }
+}

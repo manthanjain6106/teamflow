@@ -61,30 +61,7 @@ export default function SignIn() {
     }
   };
 
-  const handleDemoSignIn = async () => {
-    setEmail('demo@teamflow.com');
-    setPassword('demo123');
-    setLoading(true);
-    setError('');
-
-    try {
-      const result = await signIn('credentials', {
-        email: 'demo@teamflow.com',
-        password: 'demo123',
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError('Demo account not available - please create an account');
-      } else {
-        router.push('/app');
-      }
-    } catch (error) {
-      setError('Demo account not available');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Demo account removed for production. Users should sign in with real credentials.
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
@@ -201,15 +178,7 @@ export default function SignIn() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <button
-              onClick={handleDemoSignIn}
-              disabled={loading}
-              className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Try Demo Account
-            </button>
-          </div>
+          {/* Demo login removed in production */}
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">

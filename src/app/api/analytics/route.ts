@@ -22,14 +22,7 @@ export async function GET(request: NextRequest) {
     const workspace = await prisma.workspace.findFirst({
       where: {
         id: workspaceId,
-        OR: [
-          { creatorId: session.user.id },
-          { 
-            members: {
-              some: { userId: session.user.id }
-            }
-          }
-        ]
+        members: { some: { userId: session.user.id } }
       }
     });
 
@@ -102,14 +95,7 @@ export async function GET(request: NextRequest) {
     // Team performance data
     const teamPerformance = await prisma.user.findMany({
       where: {
-        OR: [
-          { id: workspace.creatorId },
-          {
-            workspaceMemberships: {
-              some: { workspaceId },
-            },
-          },
-        ],
+        workspaceMembers: { some: { workspaceId } },
       },
       include: {
         assignedTasks: {

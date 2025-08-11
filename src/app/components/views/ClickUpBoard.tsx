@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCorners } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCorners, useDroppable, MouseSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -14,7 +14,7 @@ interface Task {
   id: string;
   name: string;
   description?: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELED';
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE' | 'CANCELLED';
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
   dueDate?: string;
   startDate?: string;
@@ -53,6 +53,16 @@ import {
   Circle,
   Loader2
 } from 'lucide-react';
+
+// Droppable column wrapper to improve drop targeting
+function ColumnDroppable({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={isOver ? 'outline outline-2 outline-purple-500 rounded-lg' : ''}>
+      {children}
+    </div>
+  );
+}
 
 interface BoardColumn {
   id: string;
@@ -246,6 +256,12 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
     spaceId: spaceId || selectedSpace?.id
   });
 
+  // Sensors for mouse/touch/keyboard dragging
+  const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 5 } });
+  const touchSensor = useSensor(TouchSensor, { pressDelay: 150, tolerance: 5 });
+  const keyboardSensor = useSensor(KeyboardSensor);
+  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
+
   // Define board columns based on task statuses
   const defaultColumns: BoardColumn[] = [
     {
@@ -295,7 +311,18 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
     if (!over) return;
 
     const taskId = active.id as string;
-    const newStatus = over.id as string;
+    const overId = over.id as string;
+
+    // Determine destination column id (status)
+    let newStatus = overId;
+    const columnIds = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+    if (!columnIds.includes(newStatus)) {
+      // If dropping over another task, find the column that contains that task
+      const destinationColumn = boardColumns.find((col) => col.tasks.some((t) => t.id === overId));
+      if (destinationColumn) {
+        newStatus = destinationColumn.id;
+      }
+    }
 
     // Find the task
     const task = allTasks.find(t => t.id === taskId);
@@ -303,7 +330,7 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
 
     try {
       // Update task status
-      await updateTask(taskId, { status: newStatus });
+      await updateTask({ id: taskId, status: newStatus });
       refetch();
     } catch (error) {
       console.error('Failed to update task status:', error);
@@ -395,6 +422,7 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
   return (
     <div className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 overflow-hidden">
       <DndContext
+        sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         collisionDetection={closestCorners}
@@ -432,6 +460,7 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
               </div>
 
               {/* Column Content */}
+              <ColumnDroppable id={column.id}>
               <div className="p-4 flex-1 overflow-y-auto">
                 <SortableContext 
                   items={column.tasks.map(task => task.id)}
@@ -485,6 +514,7 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
                   </div>
                 )}
               </div>
+              </ColumnDroppable>
             </div>
           ))}
 

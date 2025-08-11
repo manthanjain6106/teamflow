@@ -3,13 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Calendar, Flag, CheckSquare, Users } from 'lucide-react';
 import { useUsers } from '@/hooks/useUsers';
+import { useLists } from '@/hooks/useData';
 import { useStore } from '@/store/useStore';
 
 interface Task {
   id?: string;
   name: string;
   description?: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELED';
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE' | 'CANCELLED';
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
   dueDate?: string;
   startDate?: string;
@@ -32,18 +33,22 @@ const WorkingTaskModal: React.FC<WorkingTaskModalProps> = ({
   onSave,
   defaultDueDate
 }) => {
-  const { selectedWorkspace, selectedList, lists } = useStore();
+  const { selectedWorkspace, selectedSpace, selectedList, lists } = useStore();
+  // Prefer the space of the provided task, fallback to selectedSpace
+  const effectiveSpaceId = (task as any)?.list?.space?.id || selectedSpace?.id;
+  // Ensure lists are available even if store is empty
+  const { lists: fetchedLists } = useLists(effectiveSpaceId);
   const { users, loading: usersLoading } = useUsers(selectedWorkspace?.id);
   
   const [formData, setFormData] = useState<Task>({
     name: '',
     description: '',
-    status: 'OPEN',
+    status: 'TODO',
     priority: 'NORMAL',
     dueDate: '',
     startDate: '',
     assigneeId: '',
-    listId: selectedList?.id || (lists && lists.length > 0 ? lists[0].id : '')
+    listId: selectedList?.id || (lists && lists.length > 0 ? lists[0].id : (fetchedLists && fetchedLists.length > 0 ? fetchedLists[0].id : ''))
   });
   
   const [loading, setLoading] = useState(false);
@@ -67,15 +72,15 @@ const WorkingTaskModal: React.FC<WorkingTaskModalProps> = ({
       setFormData({
         name: '',
         description: '',
-        status: 'OPEN',
+        status: 'TODO',
         priority: 'NORMAL',
         dueDate: defaultDueDate ? defaultDueDate.toISOString().split('T')[0] : '',
         startDate: new Date().toISOString().split('T')[0],
         assigneeId: '',
-        listId: selectedList?.id || (lists && lists.length > 0 ? lists[0].id : '')
+        listId: selectedList?.id || (lists && lists.length > 0 ? lists[0].id : (fetchedLists && fetchedLists.length > 0 ? fetchedLists[0].id : ''))
       });
     }
-  }, [task, defaultDueDate, selectedList, lists]);
+  }, [task, defaultDueDate, selectedList, lists, fetchedLists]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +108,7 @@ const WorkingTaskModal: React.FC<WorkingTaskModalProps> = ({
 
       if (task?.id) {
         // Update existing task
-        const response = await fetch(`/api/tasks?id=${task.id}`, {
+        const response = await fetch(`/api/tasks/${task.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -139,10 +144,11 @@ const WorkingTaskModal: React.FC<WorkingTaskModalProps> = ({
   };
 
   const statusOptions = [
-    { value: 'OPEN', label: 'Open', color: 'bg-blue-500' },
+    { value: 'TODO', label: 'To do', color: 'bg-blue-500' },
     { value: 'IN_PROGRESS', label: 'In Progress', color: 'bg-yellow-500' },
+    { value: 'IN_REVIEW', label: 'In Review', color: 'bg-purple-500' },
     { value: 'DONE', label: 'Done', color: 'bg-green-500' },
-    { value: 'CANCELED', label: 'Canceled', color: 'bg-gray-500' }
+    { value: 'CANCELLED', label: 'Cancelled', color: 'bg-gray-500' }
   ];
 
   const priorityOptions = [
@@ -285,12 +291,17 @@ const WorkingTaskModal: React.FC<WorkingTaskModalProps> = ({
                   required
                 >
                   <option value="">Select a list</option>
-                  {lists?.map((list) => (
+                  {(lists?.length ? lists : fetchedLists || []).map((list) => (
                     <option key={list.id} value={list.id}>
                       {list.name}
                     </option>
                   ))}
                 </select>
+                {(!lists?.length && !(fetchedLists && fetchedLists.length)) && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    No lists found. Create a Space and List first from the + menu in the header, or select a Space in the sidebar.
+                  </p>
+                )}
               </div>
 
               {/* Start Date */}

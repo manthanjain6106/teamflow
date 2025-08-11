@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Table, 
   ChevronDown, 
@@ -39,7 +39,7 @@ interface SortConfig {
 
 export default function ClickUpTableView() {
   const { selectedSpace, selectedList } = useStore();
-  const { data: tasks = [], loading, refetch } = useTasks(selectedList?.id, selectedSpace?.id);
+  const { tasks = [], loading, refetch } = useTasks({ listId: selectedList?.id, spaceId: selectedSpace?.id });
   
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
@@ -60,6 +60,15 @@ export default function ClickUpTableView() {
     { key: 'created', label: 'Created', width: 150, sortable: true, type: 'date', visible: false },
     { key: 'updated', label: 'Updated', width: 150, sortable: true, type: 'date', visible: false },
   ]);
+
+  // Listen to global create task events (from header create menu)
+  useEffect(() => {
+    const handler = () => {
+      handleCreateTask();
+    };
+    window.addEventListener('openCreateTask', handler as EventListener);
+    return () => window.removeEventListener('openCreateTask', handler as EventListener);
+  }, []);
 
   // Sort and filter tasks
   const processedTasks = useMemo(() => {
@@ -143,7 +152,7 @@ export default function ClickUpTableView() {
     const newTask = {
       name: '',
       description: '',
-      status: 'OPEN',
+      status: 'TODO',
       priority: 'NORMAL',
       listId: selectedList?.id || '',
       assigneeId: ''
@@ -154,10 +163,11 @@ export default function ClickUpTableView() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'OPEN': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      case 'TODO': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
       case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'IN_REVIEW': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
       case 'DONE': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'CANCELED': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'CANCELLED': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
