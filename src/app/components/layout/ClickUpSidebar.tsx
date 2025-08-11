@@ -571,9 +571,17 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                     {lists
                       .filter((list: any) => list.spaceId === space.id)
                       .map((list: any) => (
-                        <button
+                        <div
                           key={list.id}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => handleListClick(list)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleListClick(list);
+                            }
+                          }}
                           className={`flex items-center w-full px-2 py-0.5 text-xs transition-colors rounded ${
                             selectedList?.id === list.id
                               ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' 
@@ -599,7 +607,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                           >
                             <Trash2 className="h-3 w-3" />
                           </button>
-                        </button>
+                        </div>
                       ))}
                     <button 
                       className="flex items-center px-2 py-0.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors w-full"
