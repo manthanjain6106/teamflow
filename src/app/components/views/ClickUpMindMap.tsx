@@ -1,14 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { 
   Brain, 
-  Plus, 
-  Minus, 
   RotateCcw, 
-  Move, 
-  Edit3, 
-  Trash2,
   ZoomIn,
   ZoomOut,
   Save
@@ -33,9 +28,19 @@ interface Connection {
   toId: string;
 }
 
+interface SimpleTask {
+  id: string;
+  name: string;
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE' | 'CANCELLED' | string;
+}
+
 export default function ClickUpMindMap() {
   const { selectedSpace, selectedList } = useStore();
-  const { data: tasks = [] } = useTasks(selectedList?.id, selectedSpace?.id);
+  const { tasks: taskData = [] } = useTasks({ listId: selectedList?.id, spaceId: selectedSpace?.id });
+  const tasks: SimpleTask[] = useMemo(
+    () => taskData.map((t: any) => ({ id: t.id, name: t.name, status: t.status })),
+    [taskData]
+  );
   
   const svgRef = useRef<SVGSVGElement>(null);
   const [nodes, setNodes] = useState<MindMapNode[]>([]);
@@ -45,6 +50,8 @@ export default function ClickUpMindMap() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef<{ x: number; y: number } | null>(null);
   const [editingNode, setEditingNode] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
 
@@ -67,7 +74,7 @@ export default function ClickUpMindMap() {
   // Auto-generate nodes from tasks
   useEffect(() => {
     if (tasks.length > 0 && nodes.length === 1) {
-      const taskNodes: MindMapNode[] = tasks.slice(0, 8).map((task: any, index) => {
+      const taskNodes: MindMapNode[] = tasks.slice(0, 8).map((task: SimpleTask, index) => {
         const angle = (index / tasks.length) * 2 * Math.PI;
         const radius = 150;
         const x = 400 + Math.cos(angle) * radius;
@@ -104,13 +111,43 @@ export default function ClickUpMindMap() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-    case 'TODO': return '#6b7280';
+      case 'TODO': return '#6b7280';
       case 'IN_PROGRESS': return '#3b82f6';
+      case 'IN_REVIEW': return '#f59e0b';
       case 'DONE': return '#10b981';
-    case 'CANCELLED': return '#ef4444';
+      case 'CANCELLED': return '#ef4444';
       default: return '#8b5cf6';
     }
   };
+
+  // Persistence (localStorage per space/list)
+  const storageKey = useMemo(() => {
+    const scope = selectedList?.id || selectedSpace?.id || 'global';
+    return `mindmap:${scope}`;
+  }, [selectedList?.id, selectedSpace?.id]);
+
+  // Load persisted layout
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as { nodes: MindMapNode[]; connections: Connection[]; zoom: number; pan: { x: number; y: number } };
+        if (parsed?.nodes?.length) {
+          setNodes(parsed.nodes);
+          setConnections(parsed.connections || []);
+          setZoom(parsed.zoom || 1);
+          setPan(parsed.pan || { x: 0, y: 0 });
+        }
+      } catch {}
+    }
+  }, [storageKey]);
+
+  const saveLayout = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const payload = JSON.stringify({ nodes, connections, zoom, pan });
+    localStorage.setItem(storageKey, payload);
+  }, [nodes, connections, zoom, pan, storageKey]);
 
   const addChildNode = (parentId: string) => {
     const parent = nodes.find(n => n.id === parentId);
@@ -202,22 +239,28 @@ export default function ClickUpMindMap() {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+
     if (draggedNode) {
-      const svg = svgRef.current;
-      if (svg) {
-        const rect = svg.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / zoom - pan.x - dragOffset.x;
-        const y = (e.clientY - rect.top) / zoom - pan.y - dragOffset.y;
-        
-        setNodes(prev => prev.map(n => 
-          n.id === draggedNode ? { ...n, x, y } : n
-        ));
-      }
+      const x = (e.clientX - rect.left) / zoom - pan.x - dragOffset.x;
+      const y = (e.clientY - rect.top) / zoom - pan.y - dragOffset.y;
+      setNodes(prev => prev.map(n => (n.id === draggedNode ? { ...n, x, y } : n)));
+      return;
+    }
+
+    if (isPanning && panStart.current) {
+      const dx = (e.clientX - rect.left) / zoom - panStart.current.x;
+      const dy = (e.clientY - rect.top) / zoom - panStart.current.y;
+      setPan({ x: dx, y: dy });
     }
   };
 
   const handleMouseUp = () => {
     setDraggedNode(null);
+    setIsPanning(false);
+    panStart.current = null;
   };
 
   const zoomIn = () => setZoom(prev => Math.min(prev * 1.2, 3));
@@ -265,7 +308,7 @@ export default function ClickUpMindMap() {
             <span>Reset</span>
           </button>
 
-          <button className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
+          <button onClick={saveLayout} className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
             <Save className="h-4 w-4" />
             <span>Save</span>
           </button>
@@ -280,6 +323,14 @@ export default function ClickUpMindMap() {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onMouseDown={(e) => {
+            // start panning only if not clicking on a node; here we start panning by default, and node drag will override
+            if (!draggedNode) {
+              const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+              panStart.current = { x: (e.clientX - rect.left) / zoom - pan.x, y: (e.clientY - rect.top) / zoom - pan.y };
+              setIsPanning(true);
+            }
+          }}
         >
           <defs>
             <marker
