@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
     const listId = searchParams.get('listId')
     const spaceId = searchParams.get('spaceId')
     const status = searchParams.get('status')
-    const assigneeId = searchParams.get('assigneeId')
+    const assigneeIdRaw = searchParams.get('assigneeId')
+    const createdByIdRaw = searchParams.get('createdById')
+    const watcherIdRaw = searchParams.get('watcherId')
+    const watchingRaw = searchParams.get('watching')
 
     const whereClause: Record<string, unknown> = {}
 
@@ -96,8 +99,30 @@ export async function GET(request: NextRequest) {
     if (status) {
       whereClause.status = status
     }
-    if (assigneeId) {
-      whereClause.assigneeId = assigneeId
+    const assigneeId = assigneeIdRaw === 'me' ? session.user.id : assigneeIdRaw || undefined
+    if (assigneeId) whereClause.assigneeId = assigneeId
+
+    const createdById = createdByIdRaw === 'me' ? session.user.id : createdByIdRaw || undefined
+    if (createdById) whereClause.createdById = createdById
+
+    // Watching filter: if watcherId or watching=true (me), fetch taskIds from raw collection "task_watchers"
+    const watcherId = watcherIdRaw === 'me' || (watchingRaw === 'true') ? session.user.id : watcherIdRaw || undefined
+    if (watcherId) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res: any = await (prisma as any).$runCommandRaw({
+          find: 'task_watchers',
+          filter: { userId: watcherId },
+          projection: { taskId: 1 }
+        })
+        const ids = (res?.cursor?.firstBatch || []).map((d: any) => d.taskId).filter(Boolean)
+        if (ids.length === 0) {
+          return NextResponse.json([])
+        }
+        whereClause.id = { in: ids }
+      } catch (e) {
+        console.error('Watcher filter failed', e)
+      }
     }
 
     const tasks = await prisma.task.findMany({

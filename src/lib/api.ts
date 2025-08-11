@@ -189,18 +189,33 @@ export async function updateTask(data: {
   position?: number;
 }) {
   const { id, ...updateData } = data;
-  const response = await fetch(`/api/tasks/${id}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(updateData),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to update task');
+  const attempt = async () => {
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      const msg = error.error || '';
+      // Retry on write conflict/deadlock
+      if (/write conflict|deadlock/i.test(msg)) throw new Error('RETRYABLE');
+      throw new Error(msg || 'Failed to update task');
+    }
+    return res.json();
+  };
+
+  const maxRetries = 3;
+  let delay = 150;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await attempt();
+    } catch (e: any) {
+      if (e?.message !== 'RETRYABLE' || i === maxRetries - 1) throw e;
+      await new Promise((r) => setTimeout(r, delay));
+      delay *= 2;
+    }
   }
-  return response.json();
 }
 
 export async function deleteTask(id: string) {
@@ -356,6 +371,59 @@ export async function fetchDocumentFolders(workspaceId: string) {
   if (!response.ok) {
     throw new Error('Failed to fetch document folders');
   }
+  return response.json();
+}
+
+// Document Comments API
+export async function fetchDocumentComments(documentId: string) {
+  const response = await fetch(`/api/document-comments?documentId=${documentId}`);
+  if (!response.ok) throw new Error('Failed to fetch comments');
+  return response.json();
+}
+
+export async function addDocumentComment(data: { documentId: string; content: string }) {
+  const response = await fetch('/api/document-comments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to add comment');
+  return response.json();
+}
+
+export async function deleteDocumentComment(id: string, documentId: string) {
+  const response = await fetch(`/api/document-comments?id=${id}&documentId=${documentId}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error('Failed to delete comment');
+  return response.json();
+}
+
+// Document Versions API
+export async function fetchDocumentVersions(documentId: string) {
+  const response = await fetch(`/api/document-versions?documentId=${documentId}`);
+  if (!response.ok) throw new Error('Failed to fetch versions');
+  return response.json();
+}
+
+// Document Shares API
+export async function fetchDocumentShares(documentId: string) {
+  const response = await fetch(`/api/document-shares?documentId=${documentId}`);
+  if (!response.ok) throw new Error('Failed to fetch shares');
+  return response.json();
+}
+
+export async function shareDocument(data: { documentId: string; userEmail: string; permission: 'view' | 'comment' | 'edit' | 'admin' | string }) {
+  const response = await fetch('/api/document-shares', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to share document');
+  return response.json();
+}
+
+export async function removeDocumentShare(documentId: string, userId: string) {
+  const response = await fetch(`/api/document-shares?documentId=${documentId}&userId=${userId}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error('Failed to remove share');
   return response.json();
 }
 

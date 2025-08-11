@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       where: {
         id: workspaceId,
         OR: [
-          { creatorId: session.user.id },
+          { createdById: session.user.id },
           { 
             members: {
               some: { userId: session.user.id }
@@ -56,15 +56,8 @@ export async function GET(request: NextRequest) {
             image: true,
           },
         },
-        keyResults: {
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
 
     return NextResponse.json(goals);
@@ -93,7 +86,7 @@ export async function POST(request: NextRequest) {
       where: {
         id: workspaceId,
         OR: [
-          { creatorId: session.user.id },
+          { createdById: session.user.id },
           { 
             members: {
               some: { userId: session.user.id }
@@ -107,6 +100,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
     }
 
+    // compute initial progress from keyResults if provided
+    const computedProgress = Array.isArray(keyResults) && keyResults.length > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (keyResults.reduce((acc: number, kr: any) => acc + (Number(kr.current || 0) / Math.max(1, Number(kr.target || 0))), 0) / keyResults.length) * 100
+          )
+        )
+      : 0;
+
     const goal = await prisma.goal.create({
       data: {
         title,
@@ -114,24 +117,13 @@ export async function POST(request: NextRequest) {
         dueDate: dueDate ? new Date(dueDate) : null,
         workspaceId,
         ownerId: session.user.id,
-        keyResults: {
-          create: keyResults.map((kr: any) => ({
-            name: kr.name,
-            target: kr.target,
-            current: kr.current || 0,
-          })),
-        },
+        keyResults: keyResults as any,
+        progress: computedProgress,
       },
       include: {
         owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-          },
+          select: { id: true, name: true, email: true, image: true },
         },
-        keyResults: true,
       },
     });
 
@@ -150,7 +142,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, description, status, progress, dueDate } = body;
+    const { id, title, description, status, progress, dueDate, keyResults } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Goal ID required' }, { status: 400 });
@@ -165,7 +157,7 @@ export async function PATCH(request: NextRequest) {
           { 
             workspace: {
               OR: [
-                { creatorId: session.user.id },
+                { createdById: session.user.id },
                 { 
                   members: {
                     some: { userId: session.user.id }
@@ -188,20 +180,23 @@ export async function PATCH(request: NextRequest) {
     if (status !== undefined) updateData.status = status;
     if (progress !== undefined) updateData.progress = progress;
     if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
+    if (keyResults !== undefined) {
+      updateData.keyResults = keyResults;
+      if (Array.isArray(keyResults) && keyResults.length > 0) {
+        updateData.progress = Math.min(
+          100,
+          Math.round(
+            (keyResults.reduce((acc: number, kr: any) => acc + (Number(kr.current || 0) / Math.max(1, Number(kr.target || 0))), 0) / keyResults.length) * 100
+          )
+        );
+      }
+    }
 
     const goal = await prisma.goal.update({
       where: { id },
       data: updateData,
       include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-          },
-        },
-        keyResults: true,
+        owner: { select: { id: true, name: true, email: true, image: true } },
       },
     });
 

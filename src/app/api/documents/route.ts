@@ -61,18 +61,6 @@ export async function GET(request: NextRequest) {
             color: true,
           },
         },
-        shares: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-              },
-            },
-          },
-        },
       },
       orderBy: {
         updatedAt: 'desc',
@@ -140,6 +128,24 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // index in search_index collection
+    try {
+      await (prisma as any).$runCommandRaw({
+        insert: 'search_index',
+        documents: [{
+          entityId: document.id,
+          title: document.title,
+          content: document.content || '',
+          type: 'document',
+          workspaceId: workspaceId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }],
+      });
+    } catch (e) {
+      console.error('Search index insert failed', e);
+    }
+
     return NextResponse.json(document, { status: 201 });
   } catch (error) {
     console.error('Error creating document:', error);
@@ -155,7 +161,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, content, starred, folderId } = body;
+    const { id, title, content, starred, folderId, isPublic } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Document ID required' }, { status: 400 });
@@ -178,6 +184,13 @@ export async function PATCH(request: NextRequest) {
     if (content !== undefined) updateData.content = content;
     if (starred !== undefined) updateData.starred = starred;
     if (folderId !== undefined) updateData.folderId = folderId;
+    if (isPublic !== undefined) updateData.isPublic = isPublic;
+
+    // If content/title changed, bump version and store snapshot
+    const shouldVersion = content !== undefined || title !== undefined;
+    if (shouldVersion) {
+      updateData.version = { increment: 1 } as any;
+    }
 
     const document = await prisma.document.update({
       where: { id },
@@ -200,6 +213,43 @@ export async function PATCH(request: NextRequest) {
         },
       },
     });
+
+    // Update search index
+    try {
+      await (prisma as any).$runCommandRaw({
+        update: 'search_index',
+        updates: [{
+          q: { entityId: id },
+          u: { $set: { title: document.title, content: document.content || '', updatedAt: new Date() } },
+          upsert: true,
+        }],
+      });
+    } catch (e) {
+      console.error('Search index update failed', e);
+    }
+
+    // Write a version snapshot without relying on generated Prisma client
+    if (shouldVersion) {
+      try {
+        const versionRecord = {
+          documentId: document.id,
+          title: document.title,
+          content: document.content,
+          version: document.version,
+          createdAt: new Date(),
+          createdById: session.user.id,
+        } as any;
+        // Insert into "document_versions" collection using $runCommandRaw
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dbName: any = undefined;
+        await (prisma as any).$runCommandRaw({
+          insert: 'document_versions',
+          documents: [versionRecord],
+        });
+      } catch (e) {
+        console.error('Failed to create document version snapshot', e);
+      }
+    }
 
     return NextResponse.json(document);
   } catch (error) {

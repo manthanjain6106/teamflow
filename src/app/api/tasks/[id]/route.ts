@@ -123,8 +123,8 @@ export async function PATCH(
     const body = await request.json()
     const validatedData = updateTaskSchema.parse(body)
 
-    // Use transaction for data consistency
-    const result = await prisma.$transaction(async (tx) => {
+    // Retry transaction a few times to avoid Mongo write conflicts
+    const runOnce = async () => prisma.$transaction(async (tx) => {
       // Check if user has access to the task
       const existingTask = await tx.task.findFirst({
         where: {
@@ -291,7 +291,19 @@ export async function PATCH(
       return updatedTask
     })
 
-    return NextResponse.json(result)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const result = await runOnce()
+        return NextResponse.json(result)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : ''
+        if (/write conflict|deadlock/i.test(message) && attempt < 2) {
+          await new Promise((r) => setTimeout(r, 100 * (attempt + 1)))
+          continue
+        }
+        throw err
+      }
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

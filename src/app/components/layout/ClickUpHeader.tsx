@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
-import { Search, Bell, Settings, User, Plus, MoreHorizontal, Hash, FolderOpen, Command, List, LayoutGrid, Table, Calendar, BarChart3, Clock, Brain, CheckSquare2, FileText, Target } from 'lucide-react';
+import { Bell, Settings, User, Plus, MoreHorizontal, Hash, FolderOpen, Command, List, LayoutGrid, Table, Calendar, BarChart3, Clock, Brain, CheckSquare2, FileText, Target } from 'lucide-react';
 import GlobalSearch from '@/app/components/ui/GlobalSearch';
+import dynamic from 'next/dynamic';
+const CreateWorkspaceModal = dynamic(() => import('@/app/components/ui/CreateWorkspaceModal'), { ssr: false });
+const CreateSpaceModal = dynamic(() => import('@/app/components/ui/CreateSpaceModal'), { ssr: false });
+const CreateListModal = dynamic(() => import('@/app/components/ui/CreateListModal'), { ssr: false });
 import { useRouter } from 'next/navigation';
 
 interface ClickUpHeaderProps {
@@ -23,6 +27,9 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+  const [showCreateSpace, setShowCreateSpace] = useState(false);
+  const [showCreateList, setShowCreateList] = useState(false);
   const [isMac, setIsMac] = useState(false);
   const router = useRouter();
 
@@ -152,37 +159,11 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
         return;
       }
 
-      if (type === 'list') {
-        const { selectedSpace } = useStore.getState();
-        if (!selectedSpace?.id) return alert('Select a space first');
-        const name = prompt('List name');
-        if (!name) return;
-        const { createList } = await import('@/lib/api');
-        await createList({ name, spaceId: selectedSpace.id });
-        location.reload();
-        return;
-      }
+      if (type === 'list') { setShowCreateList(true); return; }
 
-      if (type === 'space') {
-        const { selectedWorkspace } = useStore.getState();
-        if (!selectedWorkspace?.id) return alert('Select a workspace first');
-        const name = prompt('Space name');
-        if (!name) return;
-        const { createSpace } = await import('@/lib/api');
-        await createSpace({ name, workspaceId: selectedWorkspace.id });
-        location.reload();
-        return;
-      }
+      if (type === 'space') { setShowCreateSpace(true); return; }
 
-      if (type === 'workspace') {
-        const name = prompt('Workspace name');
-        if (!name) return;
-        const slug = prompt('Workspace slug (lowercase, hyphens)') || name.toLowerCase().replace(/\s+/g, '-');
-        const { createWorkspace } = await import('@/lib/api');
-        await createWorkspace({ name, slug });
-        location.reload();
-        return;
-      }
+      if (type === 'workspace') { setShowCreateWorkspace(true); return; }
 
       if (type === 'document') {
         alert('Documents create UI coming soon.');
@@ -200,10 +181,10 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
 
   return (
     <>
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 h-14 flex items-center justify-between px-6">
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-700 h-14 flex items-center justify-between px-4 sm:px-6">
         {/* Left side - Breadcrumbs and Title */}
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 truncate">
             {breadcrumbs.map((crumb, index) => (
               <div key={index} className="flex items-center space-x-2">
                 {index > 0 && <span>/</span>}
@@ -214,35 +195,19 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
               </div>
             ))}
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">
             {getPageTitle()}
           </h1>
         </div>
 
         {/* Center - Search */}
-        <div className="flex-1 max-w-md mx-8">
-          <button
-            onClick={() => setSearchOpen(true)}
-            className="w-full flex items-center px-3 py-2 text-sm text-gray-500 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            <Search className="h-4 w-4 mr-2" />
-            <span className="flex-1 text-left">Search tasks, docs, goals...</span>
-            <div className="flex items-center space-x-1">
-              <kbd className="px-1.5 py-0.5 text-xs bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded">
-                {isMac ? '⌘' : 'Ctrl'}
-              </kbd>
-              <kbd className="px-1.5 py-0.5 text-xs bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded">
-                K
-              </kbd>
-            </div>
-          </button>
-        </div>
+        {/* Search removed from header (available in sidebar and via Ctrl/Cmd+K) */}
 
         {/* Right side - Actions and user menu */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-1 sm:space-x-3">
           {/* View switcher */}
           {(selectedList || selectedSpace) && (
-            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <div className="hidden lg:flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
               <button
                 onClick={() => setCurrentView('LIST')}
                 className={`flex items-center space-x-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -320,6 +285,45 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
                 <Brain className="h-4 w-4" />
                 <span>Mind Map</span>
               </button>
+            </div>
+          )}
+          {(selectedList || selectedSpace) && (
+            <div className="lg:hidden">
+              <div className="relative" data-menu-trigger>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMoreMenu(!showMoreMenu);
+                    setShowUserMenu(false);
+                    setShowNotifications(false);
+                    setShowCreateMenu(false);
+                  }}
+                  className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-md"
+                >
+                  Views
+                </button>
+                {showMoreMenu && (
+                  <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow z-50" data-menu>
+                    {[
+                      { key: 'LIST', label: 'List' },
+                      { key: 'BOARD', label: 'Board' },
+                      { key: 'TABLE', label: 'Table' },
+                      { key: 'CALENDAR', label: 'Calendar' },
+                      { key: 'GANTT', label: 'Gantt' },
+                      { key: 'TIMELINE', label: 'Timeline' },
+                      { key: 'MIND_MAP', label: 'Mind Map' },
+                    ].map((v) => (
+                      <button
+                        key={v.key}
+                        onClick={() => { setCurrentView(v.key as any); setShowMoreMenu(false); }}
+                        className={`w-full text-left px-3 py-2 text-sm ${currentView === v.key ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -500,6 +504,11 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
           </div>
         </div>
       )}
+
+      {/* Create Popups */}
+      <CreateWorkspaceModal isOpen={showCreateWorkspace} onClose={() => setShowCreateWorkspace(false)} />
+      <CreateSpaceModal isOpen={showCreateSpace} onClose={() => setShowCreateSpace(false)} />
+      <CreateListModal isOpen={showCreateList} onClose={() => setShowCreateList(false)} />
     </>
   );
 }

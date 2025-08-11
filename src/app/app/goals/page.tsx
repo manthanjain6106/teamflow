@@ -3,6 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { useGoals } from '@/hooks/useData';
+import dynamic from 'next/dynamic';
+const { CreateGoalModal, EditGoalModal } = ({} as any);
+// dynamic imports to avoid SSR issues
+const CreateModal = dynamic(() => import('./GoalModals').then(m => m.CreateGoalModal), { ssr: false });
+const EditModal = dynamic(() => import('./GoalModals').then(m => m.EditGoalModal), { ssr: false });
 import { 
   Target, 
   Plus, 
@@ -311,8 +316,8 @@ export default function GoalsPage() {
                       Key Results ({goal.keyResults.length})
                     </p>
                     <div className="space-y-1">
-                      {goal.keyResults.slice(0, 2).map((kr) => (
-                        <div key={kr.id} className="flex items-center justify-between text-xs">
+                      {goal.keyResults.slice(0, 2).map((kr: any, i: number) => (
+                        <div key={kr?.id || kr?.name || i} className="flex items-center justify-between text-xs">
                           <span className="text-gray-700 dark:text-gray-300 truncate flex-1 mr-2">
                             {kr.name}
                           </span>
@@ -364,62 +369,12 @@ export default function GoalsPage() {
         )}
       </div>
 
-      {/* Create Goal Modal would go here */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Create New Goal
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Goal creation modal would be implemented here with form fields for title, description, key results, due date, etc.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-              >
-                Create Goal
-              </button>
-            </div>
-          </div>
-        </div>
+      {showCreateModal && selectedWorkspace?.id && (
+        <CreateModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} workspaceId={selectedWorkspace.id} onCreated={refetch} />
       )}
 
-      {/* Goal Detail Modal would go here */}
       {showGoalModal && selectedGoal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {selectedGoal.title}
-              </h2>
-              <button
-                onClick={() => setShowGoalModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Detailed goal view would show full description, all key results with progress tracking, timeline, owner details, and edit capabilities.
-            </p>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowGoalModal(false)}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <EditModal isOpen={showGoalModal} onClose={() => setShowGoalModal(false)} goal={selectedGoal} onUpdated={refetch} />
       )}
     </div>
   );

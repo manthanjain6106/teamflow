@@ -39,7 +39,8 @@ import {
   Eye,
   MessageSquare,
   Activity,
-  Loader2
+  Loader2,
+  Grid
 } from 'lucide-react';
 
 interface ClickUpSidebarProps {
@@ -73,6 +74,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
   const [hoverSection, setHoverSection] = useState<string | null>(null);
   const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({});
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
 
   // Fetch real data
   const { workspaces, loading: workspacesLoading, error: workspacesError } = useWorkspaces();
@@ -178,36 +180,13 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
 
   // Everything section items
   const everything = [
-    {
-      name: 'Assigned to me',
-      href: '/app/assigned',
-      icon: CheckSquare2,
-    },
-    {
-      name: 'Created by me',
-      href: '/app/created',
-      icon: Plus
-    },
-    {
-      name: 'Watching',
-      href: '/app/watching',
-      icon: Eye
-    },
-    {
-      name: 'Recently viewed',
-      href: '/app/recent',
-      icon: Clock
-    },
-    {
-      name: 'Time tracking',
-      href: '/app/time',
-      icon: Timer
-    },
-    {
-      name: 'Activity',
-      href: '/app/activity',
-      icon: Activity
-    }
+    { name: 'Assigned to me', href: '/app/assigned', icon: CheckSquare2 },
+    { name: 'Created by me', href: '/app/created', icon: Plus },
+    { name: 'Watching', href: '/app/watching', icon: Eye },
+    { name: 'All', href: '/app/everything', icon: Grid },
+    { name: 'Recently viewed', href: '/app/recent', icon: Clock },
+    { name: 'Time tracking', href: '/app/time', icon: Timer },
+    { name: 'Activity', href: '/app/activity', icon: Activity },
   ];
 
   if (sidebarCollapsed) {
@@ -279,7 +258,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
   return (
     <div className={`w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col ${className}`}>
       {/* Header */}
-      <div className="h-12 px-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+      <div className="h-12 px-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 relative">
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setSidebarCollapsed(true)}
@@ -288,10 +267,12 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
             C
           </button>
           <div className="flex items-center space-x-1">
-            <span className="font-semibold text-gray-900 dark:text-white text-sm">
-              {workspacesLoading ? 'Loading...' : selectedWorkspace?.name || 'Workspace'}
-            </span>
-            <ChevronDown className="h-3 w-3 text-gray-500" />
+            <button onClick={() => setShowWorkspaceMenu((v) => !v)} className="flex items-center space-x-1">
+              <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                {workspacesLoading ? 'Loading...' : selectedWorkspace?.name || 'Workspace'}
+              </span>
+              <ChevronDown className="h-3 w-3 text-gray-500" />
+            </button>
           </div>
         </div>
         <div className="flex items-center space-x-1">
@@ -311,6 +292,52 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
           </button>
         </div>
       </div>
+      {showWorkspaceMenu && (
+        <div className="absolute left-2 right-2 top-12 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2">
+          <button
+            onClick={() => {
+              setShowWorkspaceMenu(false);
+              setShowMembersModal(true);
+            }}
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+          >
+            Manage members
+          </button>
+          <button
+            onClick={async () => {
+              setShowWorkspaceMenu(false);
+              if (!selectedWorkspace?.id) return;
+              const name = prompt('Rename workspace', selectedWorkspace.name || '')
+              if (!name || name === selectedWorkspace.name) return;
+              try {
+                await fetch(`/api/workspaces/${selectedWorkspace.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+                window.location.reload();
+              } catch (e) {
+                alert('Failed to rename workspace')
+              }
+            }}
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+          >
+            Rename workspace
+          </button>
+          <button
+            onClick={async () => {
+              setShowWorkspaceMenu(false);
+              if (!selectedWorkspace?.id) return;
+              if (!confirm('Delete this workspace? All data will be removed.')) return;
+              try {
+                await fetch(`/api/workspaces/${selectedWorkspace.id}`, { method: 'DELETE' })
+                window.location.reload();
+              } catch (e) {
+                alert('Failed to delete workspace')
+              }
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+          >
+            Delete workspace
+          </button>
+        </div>
+      )}
       {selectedWorkspace?.id && (
         <WorkspaceMembersModal
           workspaceId={selectedWorkspace.id}

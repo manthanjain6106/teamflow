@@ -17,7 +17,7 @@ import {
   Trash2 as Trash
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
-import { fetchWorkspaceMembers, addWorkspaceMember, updateWorkspaceMemberRole, removeWorkspaceMember } from '@/lib/api';
+import { fetchWorkspaceMembers, addWorkspaceMember, updateWorkspaceMemberRole, removeWorkspaceMember, fetchUserSettings, updateUserSettings } from '@/lib/api';
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -31,6 +31,27 @@ export default function SettingsPage() {
     mentions: true,
     dueDates: true
   });
+  const [profile, setProfile] = useState({ name: '', image: '' });
+  const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system');
+  const [security, setSecurity] = useState({ twoFactor: false });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await fetchUserSettings();
+        setAppearance((s?.theme as any) || 'system');
+        setNotifications({
+          email: s?.emailNotifications ?? true,
+          push: s?.pushNotifications ?? true,
+          taskAssigned: s?.taskAssigned ?? true,
+          taskCompleted: s?.taskCompleted ?? false,
+          mentions: s?.mentions ?? true,
+          dueDates: s?.dueDates ?? true,
+        });
+        setProfile({ name: session?.user?.name || '', image: session?.user?.image || '' });
+      } catch {}
+    })();
+  }, [session?.user?.id]);
 
   const tabs = [
     { id: 'profile', name: 'Profile', icon: User },
@@ -89,21 +110,13 @@ export default function SettingsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Full Name
               </label>
-              <input
-                type="text"
-                defaultValue={session?.user?.name || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              />
+              <input type="text" value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email
               </label>
-              <input
-                type="email"
-                defaultValue={session?.user?.email || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              />
+              <input type="email" value={session?.user?.email || ''} readOnly className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -305,14 +318,15 @@ export default function SettingsPage() {
               Theme
             </h4>
             <div className="grid grid-cols-3 gap-3">
-              {['Light', 'Dark', 'System'].map((theme) => (
+              {(['Light', 'Dark', 'System'] as const).map((theme) => (
                 <div key={theme} className="relative">
                   <input
                     type="radio"
                     name="theme"
                     id={theme.toLowerCase()}
                     className="sr-only peer"
-                    defaultChecked={theme === 'System'}
+                    checked={appearance === (theme.toLowerCase() as any)}
+                    onChange={() => setAppearance(theme.toLowerCase() as any)}
                   />
                   <label
                     htmlFor={theme.toLowerCase()}
@@ -592,7 +606,24 @@ export default function SettingsPage() {
               
               {/* Save Button */}
               <div className="flex justify-end pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
-                <button className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                <button
+                  onClick={async () => {
+                    try {
+                      await updateUserSettings({
+                        theme: appearance,
+                        emailNotifications: notifications.email,
+                        pushNotifications: notifications.push,
+                        taskAssigned: notifications.taskAssigned,
+                        taskCompleted: notifications.taskCompleted,
+                        mentions: notifications.mentions,
+                        dueDates: notifications.dueDates,
+                      });
+                    } catch (e) {
+                      alert('Failed to update settings');
+                    }
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
                   <Save className="h-4 w-4" />
                   <span>Save Changes</span>
                 </button>

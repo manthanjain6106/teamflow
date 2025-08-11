@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDocuments, useDocumentFolders } from '@/hooks/useData';
 import { useStore } from '@/store/useStore';
 import { createDocument, createDocumentFolder, updateDocument, deleteDocument } from '@/lib/api';
-import { FileText, Plus, Search, Grid, List, Folder, Clock, User, Star, Loader2 } from 'lucide-react';
+import { FileText, Plus, Search, Grid, List, Folder, Clock, User, Star, Loader2, Trash2 } from 'lucide-react';
 
 export default function DocsPage() {
+  const router = useRouter();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,13 +29,16 @@ export default function DocsPage() {
     if (!selectedWorkspace?.id) return;
     
     try {
-      await createDocument({
+      const created = await createDocument({
         title: 'Untitled Document',
         content: '',
         workspaceId: selectedWorkspace.id,
         folderId: selectedFolder || undefined,
       });
       refetchDocs();
+      if (created?.id) {
+        router.push(`/app/docs/${created.id}?edit=1`);
+      }
     } catch (error) {
       console.error('Failed to create document:', error);
     }
@@ -71,6 +76,16 @@ export default function DocsPage() {
     if (searchTerm && !doc.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
+
+  const handleDeleteDocument = async (docId: string) => {
+    if (!confirm('Delete this document?')) return;
+    try {
+      await deleteDocument(docId);
+      refetchDocs();
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+    }
+  };
 
   const loading = docsLoading || foldersLoading;
   const error = docsError || foldersError;
@@ -271,6 +286,7 @@ export default function DocsPage() {
                 <div
                   key={doc.id}
                   className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => router.push(`/app/docs/${doc.id}`)}
                 >
                   <div className="p-4">
                     <div className="flex items-start justify-between mb-3">
@@ -291,6 +307,16 @@ export default function DocsPage() {
                               : 'text-gray-400'
                           }`} 
                         />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDocument(doc.id);
+                        }}
+                        className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
                       </button>
                     </div>
                     <h3 className="font-medium text-gray-900 dark:text-white mb-2 line-clamp-2">
@@ -356,7 +382,7 @@ export default function DocsPage() {
                       key={doc.id}
                       className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
                     >
-                      <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-4">
                         <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
                           <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
@@ -379,6 +405,16 @@ export default function DocsPage() {
                                     : 'text-gray-400'
                                 }`} 
                               />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteDocument(doc.id);
+                              }}
+                              className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
                             </button>
                           </div>
                           <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">

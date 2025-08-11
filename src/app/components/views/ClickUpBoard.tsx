@@ -245,6 +245,9 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
   const { selectedSpace, selectedList } = useStore();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [boardColumns, setBoardColumns] = useState<BoardColumn[]>([]);
+  const [customColumns, setCustomColumns] = useState<Record<string, { id: string; name: string; color: string }> | null>(null);
+  const [addingColumn, setAddingColumn] = useState(false);
+  const [newColumnName, setNewColumnName] = useState('');
   const [newTaskNames, setNewTaskNames] = useState<Record<string, string>>({});
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -292,12 +295,54 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
 
   // Organize tasks by status
   useEffect(() => {
-    const columns = defaultColumns.map(column => ({
+    const base = customColumns
+      ? Object.values(customColumns).map((c) => ({ id: c.id, name: c.name, color: c.color, tasks: [] as Task[] }))
+      : defaultColumns;
+    const columns = base.map((column) => ({
       ...column,
-      tasks: allTasks.filter(task => task.status === column.id)
+      tasks: allTasks.filter((task) => task.status === column.id),
     }));
     setBoardColumns(columns);
-  }, [allTasks]);
+  }, [allTasks, customColumns]);
+
+  // Persist custom columns per list (localStorage for now)
+  useEffect(() => {
+    if (!selectedList?.id) return;
+    const key = `boardColumns:${selectedList.id}`;
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+    if (saved) {
+      try {
+        setCustomColumns(JSON.parse(saved));
+      } catch {}
+    }
+  }, [selectedList?.id]);
+
+  const persistColumns = (cols: Record<string, { id: string; name: string; color: string }>) => {
+    if (!selectedList?.id) return;
+    const key = `boardColumns:${selectedList.id}`;
+    localStorage.setItem(key, JSON.stringify(cols));
+    setCustomColumns(cols);
+  };
+
+  const handleAddColumn = () => {
+    setAddingColumn(true);
+  };
+
+  const commitAddColumn = () => {
+    const name = newColumnName.trim();
+    if (!name) {
+      setAddingColumn(false);
+      setNewColumnName('');
+      return;
+    }
+    const id = name.toUpperCase().replace(/\s+/g, '_');
+    const color = '#8b5cf6';
+    const next = { ...(customColumns || Object.fromEntries(defaultColumns.map((c) => [c.id, { id: c.id, name: c.name, color: c.color }]))) };
+    next[id] = { id, name, color };
+    persistColumns(next);
+    setAddingColumn(false);
+    setNewColumnName('');
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     const task = allTasks.find(t => t.id === event.active.id);
@@ -518,14 +563,30 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
             </div>
           ))}
 
-          {/* Add Column Button */}
+          {/* Add Column Button / Editor */}
           <div className="flex-shrink-0 w-80">
-            <button className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center text-gray-500 hover:border-gray-400 hover:text-gray-600 dark:hover:border-gray-500 dark:hover:text-gray-400 transition-colors">
-              <div className="text-center">
-                <Plus className="h-6 w-6 mx-auto mb-2" />
-                <span className="text-sm font-medium">Add column</span>
+            {addingColumn ? (
+              <div className="h-32 border-2 border-dashed border-purple-400 rounded-lg flex items-center justify-center px-3">
+                <input
+                  autoFocus
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitAddColumn();
+                    if (e.key === 'Escape') { setAddingColumn(false); setNewColumnName(''); }
+                  }}
+                  placeholder="Column name"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800"
+                />
               </div>
-            </button>
+            ) : (
+              <button onClick={handleAddColumn} className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center text-gray-500 hover:border-gray-400 hover:text-gray-600 dark:hover:border-gray-500 dark:hover:text-gray-400 transition-colors">
+                <div className="text-center">
+                  <Plus className="h-6 w-6 mx-auto mb-2" />
+                  <span className="text-sm font-medium">Add column</span>
+                </div>
+              </button>
+            )}
           </div>
         </div>
 
