@@ -210,8 +210,9 @@ export async function updateTask(data: {
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await attempt();
-    } catch (e: any) {
-      if (e?.message !== 'RETRYABLE' || i === maxRetries - 1) throw e;
+    } catch (e: unknown) {
+      const message = typeof e === 'object' && e && 'message' in e ? String((e as { message?: unknown }).message) : '';
+      if (message !== 'RETRYABLE' || i === maxRetries - 1) throw e;
       await new Promise((r) => setTimeout(r, delay));
       delay *= 2;
     }
