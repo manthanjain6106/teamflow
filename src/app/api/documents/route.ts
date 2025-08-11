@@ -31,7 +31,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const where: any = {
+    const where: {
+      workspaceId: string;
+      folderId?: string;
+      starred?: boolean;
+    } = {
       workspaceId,
     };
 
@@ -82,7 +86,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, content, workspaceId, folderId, starred = false } = body;
+    const { title, content, workspaceId, folderId, starred = false } = body as {
+      title?: string;
+      content?: string;
+      workspaceId?: string;
+      folderId?: string | null;
+      starred?: boolean;
+    };
 
     if (!title || !workspaceId) {
       return NextResponse.json({ error: 'Title and workspace ID required' }, { status: 400 });
@@ -130,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     // index in search_index collection
     try {
-      await (prisma as any).$runCommandRaw({
+      await (prisma as unknown as { $runCommandRaw: (cmd: unknown) => Promise<unknown> }).$runCommandRaw({
         insert: 'search_index',
         documents: [{
           entityId: document.id,
@@ -161,7 +171,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, content, starred, folderId, isPublic } = body;
+    const { id, title, content, starred, folderId, isPublic } = body as {
+      id?: string;
+      title?: string;
+      content?: string;
+      starred?: boolean;
+      folderId?: string | null;
+      isPublic?: boolean;
+    };
 
     if (!id) {
       return NextResponse.json({ error: 'Document ID required' }, { status: 400 });
@@ -179,7 +196,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Document not found or no permission' }, { status: 404 });
     }
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (title !== undefined) updateData.title = title;
     if (content !== undefined) updateData.content = content;
     if (starred !== undefined) updateData.starred = starred;
@@ -189,7 +206,7 @@ export async function PATCH(request: NextRequest) {
     // If content/title changed, bump version and store snapshot
     const shouldVersion = content !== undefined || title !== undefined;
     if (shouldVersion) {
-      updateData.version = { increment: 1 } as any;
+      updateData.version = { increment: 1 } as { increment: number };
     }
 
     const document = await prisma.document.update({
@@ -216,7 +233,7 @@ export async function PATCH(request: NextRequest) {
 
     // Update search index
     try {
-      await (prisma as any).$runCommandRaw({
+      await (prisma as unknown as { $runCommandRaw: (cmd: unknown) => Promise<unknown> }).$runCommandRaw({
         update: 'search_index',
         updates: [{
           q: { entityId: id },
@@ -231,18 +248,23 @@ export async function PATCH(request: NextRequest) {
     // Write a version snapshot without relying on generated Prisma client
     if (shouldVersion) {
       try {
-        const versionRecord = {
+        const versionRecord: {
+          documentId: string;
+          title: string;
+          content: string | null;
+          version: number;
+          createdAt: Date;
+          createdById: string;
+        } = {
           documentId: document.id,
           title: document.title,
           content: document.content,
           version: document.version,
           createdAt: new Date(),
           createdById: session.user.id,
-        } as any;
+        };
         // Insert into "document_versions" collection using $runCommandRaw
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dbName: any = undefined;
-        await (prisma as any).$runCommandRaw({
+        await (prisma as unknown as { $runCommandRaw: (cmd: unknown) => Promise<unknown> }).$runCommandRaw({
           insert: 'document_versions',
           documents: [versionRecord],
         });

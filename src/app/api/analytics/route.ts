@@ -234,7 +234,12 @@ function formatActivityType(type: string): string {
   }
 }
 
-function formatActivityDescription(activity: any, taskName?: string): string {
+type ActivityForDescription = {
+  type: string;
+  user?: { name?: string | null } | null;
+};
+
+function formatActivityDescription(activity: ActivityForDescription, taskName?: string): string {
   const userName = activity.user?.name || 'Someone';
   const task = taskName ? `"${taskName}"` : 'a task';
   

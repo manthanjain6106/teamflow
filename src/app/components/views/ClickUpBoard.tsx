@@ -154,14 +154,14 @@ function TaskCard({ task, isDragging = false, onClick }: TaskCardProps) {
       )}
 
       {/* Tags */}
-      {task.tags && task.tags.length > 0 && (
+          {task.tags && task.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
-          {task.tags.slice(0, 3).map((tagRelation: any, index: number) => (
+          {task.tags.slice(0, 3).map((tagRelation: { tag: { name: string } } | string, index: number) => (
             <span
               key={index}
               className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-2 py-0.5 rounded-full"
             >
-              {tagRelation.tag?.name || tagRelation}
+              {typeof tagRelation === 'string' ? tagRelation : tagRelation.tag?.name}
             </span>
           ))}
           {task.tags.length > 3 && (
@@ -207,7 +207,7 @@ function TaskCard({ task, isDragging = false, onClick }: TaskCardProps) {
             <div className="flex items-center space-x-1 text-xs text-gray-500">
               <Clock className="h-3 w-3" />
               <span>
-                {Math.floor(task.timeEntries.reduce((total: number, entry: any) => total + entry.duration, 0) / 3600)}h
+                {Math.floor(task.timeEntries.reduce((total: number, entry: { duration: number }) => total + entry.duration, 0) / 3600)}h
               </span>
             </div>
           )}
