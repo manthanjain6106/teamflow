@@ -100,7 +100,8 @@ export async function createWorkspace(data: {
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error('Failed to create workspace');
+    const err = await response.json().catch(() => ({} as { error?: string }));
+    throw new Error(err.error || 'Failed to create workspace');
   }
   return response.json();
 }
