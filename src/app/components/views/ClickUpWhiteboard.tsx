@@ -42,9 +42,14 @@ interface Point {
   y: number;
 }
 
-export default function ClickUpWhiteboard() {
+type WhiteboardProps = {
+  initialData?: WhiteboardElement[]
+  onChange?: (elements: WhiteboardElement[]) => void
+}
+
+export default function ClickUpWhiteboard({ initialData, onChange }: WhiteboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [elements, setElements] = useState<WhiteboardElement[]>([]);
+  const [elements, setElements] = useState<WhiteboardElement[]>(initialData || []);
   const [selectedTool, setSelectedTool] = useState<string>('select');
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [selectedFillColor, setSelectedFillColor] = useState('transparent');
@@ -207,6 +212,11 @@ export default function ClickUpWhiteboard() {
 
     ctx.restore();
   }, [elements, selectedElement, zoom, pan]);
+
+  // Emit change events for persistence
+  useEffect(() => {
+    if (onChange) onChange(elements)
+  }, [elements, onChange])
 
   const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const gridSize = 20;

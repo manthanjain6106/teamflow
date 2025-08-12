@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { runAutomations } from '@/app/api/automations/runner'
 
 const updateTaskSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -287,6 +288,15 @@ export async function PATCH(
           data: activities
         })
       }
+
+      // Fire automations after update
+      try {
+        const space = await tx.list.findUnique({ where: { id: updatedTask.listId }, select: { space: { select: { workspaceId: true } } } })
+        const workspaceId = space?.space.workspaceId as string | undefined
+        if (workspaceId) {
+          await runAutomations({ type: 'TASK_UPDATED', task: { id: updatedTask.id, name: updatedTask.name, status: updatedTask.status, priority: updatedTask.priority, listId: updatedTask.listId, createdById: updatedTask.createdById, assigneeId: updatedTask.assigneeId }, workspaceId, actorId: session.user.id, changes: {} })
+        }
+      } catch (e) { console.error('Automation error', e) }
 
       return updatedTask
     })

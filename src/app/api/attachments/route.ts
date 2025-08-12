@@ -114,6 +114,17 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Save version record
+    await prisma.attachmentVersion.create({
+      data: {
+        attachmentId: attachment.id,
+        url: attachment.url,
+        size: attachment.size,
+        type: attachment.type,
+        version: 1,
+      },
+    });
+
     // Create activity
     await prisma.activity.create({
       data: {

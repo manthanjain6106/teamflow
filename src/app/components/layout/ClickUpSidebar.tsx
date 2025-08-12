@@ -40,7 +40,8 @@ import {
   MessageSquare,
   Activity,
   Loader2,
-  Grid
+  Grid,
+  Shapes
 } from 'lucide-react';
 
 interface ClickUpSidebarProps {
@@ -160,6 +161,13 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
       color: 'text-orange-600'
     },
     {
+      name: 'Whiteboards',
+      href: '/app/whiteboards',
+      icon: Shapes,
+      active: pathname === '/app/whiteboards',
+      color: 'text-indigo-600'
+    },
+    {
       name: 'Dashboards',
       href: '/app/dashboards',
       icon: BarChart3,
@@ -167,11 +175,25 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
       color: 'text-pink-600'
     },
     {
+      name: 'Sprints',
+      href: '/app/sprints',
+      icon: Grid,
+      active: pathname === '/app/sprints',
+      color: 'text-indigo-600'
+    },
+    {
       name: 'Goals',
       href: '/app/goals',
       icon: Target,
       active: pathname === '/app/goals',
       color: 'text-teal-600'
+    },
+    {
+      name: 'Milestones',
+      href: '/app/milestones',
+      icon: Target,
+      active: pathname === '/app/milestones',
+      color: 'text-emerald-600'
     }
   ];
 

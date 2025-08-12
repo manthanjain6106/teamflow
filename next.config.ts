@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  distDir: '.next-dev',
   eslint: {
     // Do not fail builds on ESLint errors in CI/deploy. We still lint locally.
     ignoreDuringBuilds: true,

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { runAutomations } from '@/app/api/automations/runner'
 
 const createTaskSchema = z.object({
   name: z.string().min(1).max(200),
@@ -22,7 +23,8 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      // Return empty list for unauthenticated clients to avoid noisy errors on public pages
+      return NextResponse.json([])
     }
 
     const { searchParams } = new URL(request.url)
@@ -54,7 +56,8 @@ export async function GET(request: NextRequest) {
       })
 
       if (!list) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        // No access to this list -> empty set
+        return NextResponse.json([])
       }
 
       whereClause.listId = listId
@@ -74,7 +77,8 @@ export async function GET(request: NextRequest) {
       })
 
       if (!space) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        // No access to this space -> empty set
+        return NextResponse.json([])
       }
 
       whereClause.list = {
@@ -333,6 +337,14 @@ export async function POST(request: NextRequest) {
           }
         }
       })
+
+      // Run automations (best-effort, after create)
+      try {
+        const workspaceId = list.spaceId ? (await tx.space.findUnique({ where: { id: list.spaceId }, select: { workspaceId: true } }))?.workspaceId : undefined
+        if (workspaceId) {
+          await runAutomations({ type: 'TASK_CREATED', task: { id: newTask.id, name: newTask.name, status: newTask.status, priority: newTask.priority, listId: newTask.listId, createdById: newTask.createdById, assigneeId: newTask.assigneeId }, workspaceId, actorId: session.user.id })
+        }
+      } catch (e) { console.error('Automation error', e) }
 
       return newTask
     })

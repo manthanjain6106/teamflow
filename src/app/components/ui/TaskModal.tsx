@@ -11,6 +11,9 @@ import {
   AiOutlineDown 
 } from 'react-icons/ai';
 import { sendSlackMessage } from '@/lib/slack';
+import { useUsers } from '@/hooks/useUsers';
+import { useStore } from '@/store/useStore';
+import { addChecklistItem, addTaskAssignment, addTaskRelation } from '@/lib/api';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -24,7 +27,7 @@ export interface TaskData {
   taskName: string;
   description: string;
   dueDate: string;
-  assignee: TeamMember | null;
+  assignees: TeamMember[];
   priority: Priority;
   status: TaskStatus;
 }
@@ -52,14 +55,8 @@ interface TaskStatus {
   bgColor: string;
 }
 
-// Sample data - in real app, these would come from API
-const teamMembers: TeamMember[] = [
-  { id: '1', name: 'John Doe', email: 'john@teamflow.com', role: 'Team Lead' },
-  { id: '2', name: 'Sarah Johnson', email: 'sarah@teamflow.com', role: 'Designer' },
-  { id: '3', name: 'Mike Chen', email: 'mike@teamflow.com', role: 'Developer' },
-  { id: '4', name: 'Emily Davis', email: 'emily@teamflow.com', role: 'Product Manager' },
-  { id: '5', name: 'Alex Wilson', email: 'alex@teamflow.com', role: 'Developer' },
-];
+// Team members come from workspace members; fallback to empty
+const teamMembers: TeamMember[] = [];
 
 const priorities: Priority[] = [
   { id: 'low', name: 'Low', color: 'text-green-700', bgColor: 'bg-green-100', textColor: 'text-green-800' },
@@ -83,13 +80,18 @@ export default function TaskModal({
 }: TaskModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { selectedWorkspace } = useStore();
+  const { users } = useUsers(selectedWorkspace?.id);
+  const [checklistItems, setChecklistItems] = useState<Array<{ content: string; completed: boolean }>>([]);
+  const [relationsDraft, setRelationsDraft] = useState<Array<{ toTaskId: string; type: 'RELATES' | 'BLOCKS' | 'IS_BLOCKED_BY' | 'DUPLICATES' | 'IS_DUPLICATED_BY' }>>([]);
+  const [newRelation, setNewRelation] = useState<{ toTaskId: string; type: 'RELATES' | 'BLOCKS' | 'IS_BLOCKED_BY' | 'DUPLICATES' | 'IS_DUPLICATED_BY' }>({ toTaskId: '', type: 'BLOCKS' });
 
   // Form state
   const [formData, setFormData] = useState<TaskData>({
     taskName: initialData.taskName || '',
     description: initialData.description || '',
     dueDate: initialData.dueDate || '',
-    assignee: initialData.assignee || null,
+    assignees: Array.isArray((initialData as any).assignees) ? (initialData as any).assignees : [],
     priority: initialData.priority || priorities[1], // Default to Medium
     status: initialData.status || taskStatuses[0], // Default to To Do
   });
@@ -99,7 +101,7 @@ export default function TaskModal({
       taskName: '',
       description: '',
       dueDate: '',
-      assignee: null,
+      assignees: [],
       priority: priorities[1],
       status: taskStatuses[0],
     });
@@ -121,8 +123,8 @@ export default function TaskModal({
       newErrors.dueDate = 'Due date is required';
     }
 
-    if (!formData.assignee) {
-      newErrors.assignee = 'Please select an assignee';
+    if (!formData.assignees || formData.assignees.length === 0) {
+      newErrors.assignees = 'Please select at least one assignee';
     }
 
     setErrors(newErrors);
@@ -144,13 +146,71 @@ export default function TaskModal({
         onSubmit(formData);
       }
 
+      // Persist via API when possible
+      const listId = (initialData as any)?.listId as string | undefined;
+      const editingTaskId = (initialData as any)?.id as string | undefined;
+      if (editingTaskId) {
+        // Update task basic fields
+        await fetch(`/api/tasks/${editingTaskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: formData.taskName, description: formData.description, dueDate: formData.dueDate || undefined })
+        });
+        const taskId = editingTaskId;
+        if (formData.assignees?.length) {
+          await Promise.all(formData.assignees.map(a => addTaskAssignment({ taskId, userId: a.id })));
+        }
+        if (checklistItems.length) {
+          await Promise.all(checklistItems.map((it, idx) => addChecklistItem({ taskId, content: it.content, order: idx })));
+        }
+        if (relationsDraft.length) {
+          await Promise.all(relationsDraft.map(r => addTaskRelation({ fromTaskId: taskId, toTaskId: r.toTaskId, type: r.type })));
+        }
+      } else if (listId) {
+        const res = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.taskName,
+            description: formData.description,
+            dueDate: formData.dueDate || undefined,
+            listId,
+          })
+        });
+        if (res.ok) {
+          const created = await res.json();
+          const taskId: string = created.id;
+
+          // Assign all selected members
+          if (formData.assignees?.length) {
+            await Promise.all(
+              formData.assignees.map(a => addTaskAssignment({ taskId, userId: a.id }))
+            );
+          }
+
+          // Checklist items
+          if (checklistItems.length) {
+            await Promise.all(
+              checklistItems.map((it, idx) => addChecklistItem({ taskId, content: it.content, order: idx }))
+            );
+          }
+
+          // Task relations (dependencies)
+          if (relationsDraft.length) {
+            await Promise.all(
+              relationsDraft.map(r => addTaskRelation({ fromTaskId: taskId, toTaskId: r.toTaskId, type: r.type }))
+            );
+          }
+        }
+      }
+
       // Send Slack notification
       const slackMessage = [
         '📋 *New Task Created*',
         '',
         `*Task:* ${formData.taskName}`,
         `*Description:* ${formData.description}`,
-        `*Assigned to:* ${formData.assignee?.name}`,
+        `*Assigned to:* ${formData.assignees.map(a => a.name).join(', ') || '—'}`,
         `*Due Date:* ${new Date(formData.dueDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
         `*Priority:* ${formData.priority.name}`,
         `*Status:* ${formData.status.name}`,
@@ -181,7 +241,50 @@ export default function TaskModal({
   };
 
   // Get minimum date (today) for date input
-  const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+
+  // Simple inline checklist field (local-only for now; wire to API where taskId available)
+  function ChecklistField({ items, setItems }: { items: Array<{ content: string; completed: boolean }>; setItems: React.Dispatch<React.SetStateAction<Array<{ content: string; completed: boolean }>>> }) {
+    const [newItem, setNewItem] = useState('');
+
+    const addItem = () => {
+      if (!newItem.trim()) return;
+      setItems(prev => [...prev, { content: newItem.trim(), completed: false }]);
+      setNewItem('');
+    };
+
+    const toggle = (idx: number) => {
+      setItems(prev => prev.map((it, i) => i === idx ? { ...it, completed: !it.completed } : it));
+    };
+
+    const remove = (idx: number) => {
+      setItems(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    return (
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newItem}
+            onChange={e => setNewItem(e.target.value)}
+            placeholder="Add checklist item"
+            className="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button type="button" onClick={addItem} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-sm">Add</button>
+        </div>
+        <ul className="space-y-1">
+          {items.map((it, idx) => (
+            <li key={idx} className="flex items-center gap-2">
+              <input type="checkbox" checked={it.completed} onChange={() => toggle(idx)} />
+              <span className={`flex-1 ${it.completed ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>{it.content}</span>
+              <button type="button" onClick={() => remove(idx)} className="text-xs text-red-600 hover:underline">Remove</button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -360,24 +463,24 @@ export default function TaskModal({
                     </div>
                   </div>
 
-                  {/* Assignee and Status Row */}
+                  {/* Assignees and Status Row */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Assignee */}
+                    {/* Assignees (multiple) */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Assignee *
+                        Assignees *
                       </label>
-                      <Listbox value={formData.assignee} onChange={(assignee) => setFormData({ ...formData, assignee })}>
+                      <Listbox multiple value={formData.assignees} onChange={(assignees: TeamMember[]) => setFormData({ ...formData, assignees })}>
                         <div className="relative">
                           <Listbox.Button className={`relative w-full cursor-pointer rounded-lg bg-white dark:bg-gray-700 py-3 pl-4 pr-10 text-left border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            errors.assignee 
+                            errors.assignees 
                               ? 'border-red-300 dark:border-red-600' 
                               : 'border-gray-300 dark:border-gray-600'
                           }`}>
                             <div className="flex items-center space-x-3">
                               <AiOutlineUser className="w-4 h-4 text-gray-400" />
                               <span className="block truncate text-gray-900 dark:text-white">
-                                {formData.assignee ? formData.assignee.name : 'Select assignee...'}
+                                {formData.assignees.length > 0 ? `${formData.assignees.length} selected` : 'Select assignees...'}
                               </span>
                             </div>
                             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
@@ -391,7 +494,7 @@ export default function TaskModal({
                             leaveTo="opacity-0"
                           >
                             <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
-                              {teamMembers.map((member) => (
+                               {(users as any[] || []).map((member: any) => (
                                 <Listbox.Option
                                   key={member.id}
                                   className={({ active }) =>
@@ -414,7 +517,7 @@ export default function TaskModal({
                                             {member.name}
                                           </span>
                                           <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
-                                            {member.role}
+                                             {member.email}
                                           </span>
                                         </div>
                                       </div>
@@ -431,8 +534,8 @@ export default function TaskModal({
                           </Transition>
                         </div>
                       </Listbox>
-                      {errors.assignee && (
-                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.assignee}</p>
+                      {errors.assignees && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.assignees}</p>
                       )}
                     </div>
 
@@ -492,6 +595,62 @@ export default function TaskModal({
                           </Transition>
                         </div>
                       </Listbox>
+                    </div>
+                  </div>
+
+                  {/* Checklist */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Checklist
+                    </label>
+                    <ChecklistField items={checklistItems} setItems={setChecklistItems} />
+                  </div>
+
+                  {/* Dependencies */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Dependencies
+                    </label>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col md:flex-row gap-2">
+                        <select
+                          value={newRelation.type}
+                          onChange={(e) => setNewRelation(r => ({ ...r, type: e.target.value as any }))}
+                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+                        >
+                          {(['BLOCKS','IS_BLOCKED_BY','RELATES','DUPLICATES','IS_DUPLICATED_BY'] as const).map(t => (
+                            <option key={t} value={t}>{t.replaceAll('_',' ')}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Target task ID"
+                          value={newRelation.toTaskId}
+                          onChange={(e) => setNewRelation(r => ({ ...r, toTaskId: e.target.value }))}
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!newRelation.toTaskId.trim()) return;
+                            setRelationsDraft(prev => [...prev, { ...newRelation }]);
+                            setNewRelation({ toTaskId: '', type: newRelation.type });
+                          }}
+                          className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-sm"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {relationsDraft.length > 0 && (
+                        <ul className="text-sm space-y-1">
+                          {relationsDraft.map((r, idx) => (
+                            <li key={`${r.toTaskId}-${idx}`} className="flex items-center justify-between px-2 py-1 border border-gray-200 dark:border-gray-700 rounded">
+                              <span className="text-gray-700 dark:text-gray-300">{r.type.replaceAll('_',' ')} → {r.toTaskId}</span>
+                              <button type="button" className="text-xs text-red-600 hover:underline" onClick={() => setRelationsDraft(prev => prev.filter((_, i) => i !== idx))}>Remove</button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </div>
 
