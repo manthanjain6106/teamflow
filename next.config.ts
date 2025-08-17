@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
     // Optionally allow builds to proceed even with type errors from third-party fallbacks.
     ignoreBuildErrors: true,
   },
+  webpack: (config) => {
+    // Avoid requiring node-canvas when bundling client code
+    config.resolve.fallback = {
+      ...(config.resolve.fallback || {}),
+      canvas: false,
+    }
+    return config
+  },
 };
 
 export default nextConfig;

@@ -106,6 +106,8 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
     }
   }, [lists, setLists]);
 
+  // no-op
+
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -159,13 +161,6 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
       icon: FileText,
       active: pathname === '/app/docs',
       color: 'text-orange-600'
-    },
-    {
-      name: 'Whiteboards',
-      href: '/app/whiteboards',
-      icon: Shapes,
-      active: pathname === '/app/whiteboards',
-      color: 'text-indigo-600'
     },
     {
       name: 'Dashboards',
@@ -316,6 +311,27 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
       </div>
       {showWorkspaceMenu && (
         <div className="absolute left-2 right-2 top-12 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2">
+          {/* Switcher */}
+          <div className="max-h-56 overflow-auto">
+            {(workspaces || []).map((ws: any) => (
+              <button
+                key={ws.id}
+                onClick={() => {
+                  setSelectedWorkspace(ws);
+                  setShowWorkspaceMenu(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-sm rounded flex items-center justify-between ${
+                  selectedWorkspace?.id === ws.id ? 'bg-purple-50 dark:bg-purple-900/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <span className="truncate">{ws.name}</span>
+                {selectedWorkspace?.id === ws.id && (
+                  <span className="text-xs text-purple-600">Current</span>
+                )}
+              </button>
+            ))}
+          </div>
+          <hr className="my-2 border-gray-200 dark:border-gray-700" />
           <button
             onClick={() => {
               setShowWorkspaceMenu(false);

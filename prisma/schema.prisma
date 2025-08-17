@@ -48,7 +48,7 @@ model User {
   annotations         AttachmentAnnotation[]
   milestoneOwnerships Milestone[]
   sprintCapacities    SprintCapacity[]
-  whiteboards         Whiteboard[]
+  
 
   @@map("users")
 }
@@ -117,7 +117,7 @@ model Workspace {
   sprints         Sprint[]
   milestones      Milestone[]
   automationRules AutomationRule[]
-  whiteboards      Whiteboard[]
+  
 
   @@map("workspaces")
 }
@@ -669,21 +669,7 @@ model ChecklistTemplate {
   @@map("checklist_templates")
 }
 
-// Collaborative whiteboards with Excalidraw-like data
-model Whiteboard {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  data        Json     // serialized elements/bindings/appState
-  workspaceId String   @db.ObjectId
-  ownerId     String   @db.ObjectId
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  owner     User      @relation(fields: [ownerId], references: [id])
-
-  @@map("whiteboards")
-}
+// Whiteboard model removed
 
 // Global search index entries
 model SearchIndex {

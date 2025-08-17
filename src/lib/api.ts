@@ -593,34 +593,7 @@ export async function deleteSprintCapacity(sprintId: string, userId: string) {
   return res.json()
 }
 
-// Whiteboards
-export async function fetchWhiteboards(workspaceId: string) {
-  const url = new URL('/api/whiteboards', window.location.origin)
-  url.searchParams.set('workspaceId', workspaceId)
-  const res = await fetch(url.toString())
-  if (!res.ok) throw new Error('Failed to fetch whiteboards')
-  return res.json()
-}
-
-export async function createWhiteboard(data: { title: string; workspaceId: string; initialData?: any }) {
-  const res = await fetch('/api/whiteboards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: data.title, workspaceId: data.workspaceId, data: data.initialData || {} }) })
-  if (!res.ok) throw new Error('Failed to create whiteboard')
-  return res.json()
-}
-
-export async function saveWhiteboard(data: { id: string; title?: string; data?: any }) {
-  const res = await fetch('/api/whiteboards', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-  if (!res.ok) throw new Error('Failed to save whiteboard')
-  return res.json()
-}
-
-export async function deleteWhiteboard(id: string) {
-  const url = new URL('/api/whiteboards', window.location.origin)
-  url.searchParams.set('id', id)
-  const res = await fetch(url.toString(), { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete whiteboard')
-  return res.json()
-}
+// Whiteboards removed
 
 export async function addTaskToSprint(sprintId: string, taskId: string) {
   const res = await fetch(`/api/sprints/${sprintId}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskId }) })

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCorners, useDroppable, MouseSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '@/store/useStore';
@@ -58,7 +58,10 @@ import {
 function ColumnDroppable({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div ref={setNodeRef} className={isOver ? 'outline outline-2 outline-purple-500 rounded-lg' : ''}>
+    <div
+      ref={setNodeRef}
+      className={`${isOver ? 'outline outline-2 outline-purple-500 rounded-lg' : ''} h-full flex-1 flex flex-col min-h-0 overflow-hidden`}
+    >
       {children}
     </div>
   );
@@ -124,7 +127,7 @@ function TaskCard({ task, isDragging = false, onClick }: TaskCardProps) {
       {...attributes}
       {...listeners}
       onClick={() => onClick?.(task)}
-      className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 mb-2 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing group ${
+      className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 mb-2 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing group overflow-hidden ${
         isSortableDragging ? 'opacity-50 rotate-2 scale-105' : ''
       } ${isDragging ? 'opacity-50' : ''}`}
     >
@@ -349,6 +352,41 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
     setActiveTask(task);
   };
 
+  const findColumnByTaskId = (taskId: string) => boardColumns.find((c) => c.tasks.some((t) => t.id === taskId));
+  const findColumnById = (id: string) => boardColumns.find((c) => c.id === id);
+
+  const handleDragOver = (event: any) => {
+    const { active, over } = event;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    const sourceCol = findColumnByTaskId(activeId);
+    const destCol = findColumnByTaskId(overId) || findColumnById(overId);
+    if (!sourceCol || !destCol) return;
+
+    if (sourceCol.id === destCol.id) {
+      // Reorder inside same column for immediate UI feedback
+      const oldIndex = sourceCol.tasks.findIndex((t) => t.id === activeId);
+      const newIndex = destCol.tasks.findIndex((t) => t.id === overId);
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+      setBoardColumns((cols) => cols.map((c) => c.id !== sourceCol.id ? c : ({ ...c, tasks: arrayMove(c.tasks, oldIndex, newIndex) })));
+    } else {
+      // Move to another column (insert before the hovered task or to end if hovering column)
+      setBoardColumns((cols) => {
+        const next = cols.map((c) => ({ ...c, tasks: [...c.tasks] }));
+        const source = next.find((c) => c.id === sourceCol.id)!;
+        const dest = next.find((c) => c.id === destCol.id)!;
+        const fromIndex = source.tasks.findIndex((t) => t.id === activeId);
+        if (fromIndex === -1) return cols;
+        const [moved] = source.tasks.splice(fromIndex, 1);
+        const toIndex = dest.tasks.findIndex((t) => t.id === overId);
+        if (toIndex >= 0) dest.tasks.splice(toIndex, 0, moved); else dest.tasks.push(moved);
+        return next;
+      });
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
@@ -362,11 +400,8 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
     let newStatus = overId;
     const columnIds = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
     if (!columnIds.includes(newStatus)) {
-      // If dropping over another task, find the column that contains that task
       const destinationColumn = boardColumns.find((col) => col.tasks.some((t) => t.id === overId));
-      if (destinationColumn) {
-        newStatus = destinationColumn.id;
-      }
+      if (destinationColumn) newStatus = destinationColumn.id;
     }
 
     // Find the task
@@ -374,7 +409,7 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
     if (!task || task.status === newStatus) return;
 
     try {
-      // Update task status
+      // Persist new status (position persistence TBD)
       await updateTask({ id: taskId, status: newStatus });
       refetch();
     } catch (error) {
@@ -472,11 +507,11 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
         onDragEnd={handleDragEnd}
         collisionDetection={closestCorners}
       >
-        <div className="flex space-x-4 h-full overflow-x-auto">
+        <div className="flex space-x-4 h-full overflow-x-auto tf-scroll pr-1">
           {boardColumns.map((column) => (
             <div
               key={column.id}
-              className="flex-shrink-0 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
+              className="flex-shrink-0 w-80 h-full flex flex-col min-h-0 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
             >
               {/* Column Header */}
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -506,7 +541,7 @@ export default function ClickUpBoard({ listId, spaceId }: ClickUpBoardProps) {
 
               {/* Column Content */}
               <ColumnDroppable id={column.id}>
-              <div className="p-4 flex-1 overflow-y-auto">
+              <div className="p-4 flex-1 overflow-y-auto overflow-x-hidden min-h-0 tf-scroll pr-1">
                 <SortableContext 
                   items={column.tasks.map(task => task.id)}
                   strategy={verticalListSortingStrategy}
