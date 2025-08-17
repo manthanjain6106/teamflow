@@ -14,8 +14,8 @@ const geistMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TeamFlow - Modern Project Management",
-  description: "A comprehensive ClickUp clone built with Next.js, TypeScript, and Tailwind CSS",
+  title: "TeamFlow – All-in-one work platform",
+  description: "Plan tasks, write docs, track goals, and manage time in one beautiful, blazing‑fast workspace.",
 };
 
 export default function RootLayout({

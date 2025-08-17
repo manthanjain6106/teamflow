@@ -9,7 +9,7 @@ import ClickUpCalendar from '@/app/components/views/ClickUpCalendar';
 import ClickUpGantt from '@/app/components/views/ClickUpGantt';
 import ClickUpTimeline from '@/app/components/views/ClickUpTimeline';
 import ClickUpTableView from '@/app/components/views/ClickUpTableView';
-import ClickUpMindMap from '@/app/components/views/ClickUpMindMap';
+// Mind Map removed
 
 export default function AppDashboard() {
   const { data: session } = useSession();
@@ -29,8 +29,7 @@ export default function AppDashboard() {
         return <ClickUpGantt />;
       case 'TIMELINE':
         return <ClickUpTimeline />;
-      case 'MIND_MAP':
-        return <ClickUpMindMap />;
+      // MIND_MAP removed
       default:
         return <ClickUpTaskList />;
     }

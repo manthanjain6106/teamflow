@@ -1,64 +1,11 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
-
-// Types
-interface User {
-  id: string
-  email: string
-  name?: string
-  image?: string
-  role: 'ADMIN' | 'MEMBER'
-}
-
-interface Workspace {
-  id: string
-  name: string
-  slug: string
-  description?: string
-  image?: string
-  role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'GUEST'
-}
-
-interface Space {
-  id: string
-  name: string
-  description?: string
-  color?: string
-  icon?: string
-  private: boolean
-  workspaceId: string
-}
-
-interface List {
-  id: string
-  name: string
-  description?: string
-  color?: string
-  position: number
-  archived: boolean
-  spaceId: string
-}
-
-interface Task {
-  id: string
-  name: string
-  description?: string
-  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE' | 'CANCELLED'
-  priority: 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW'
-  position: number
-  startDate?: Date
-  dueDate?: Date
-  completedAt?: Date
-  listId: string
-  creatorId: string
-  assigneeId?: string
-  parentTaskId?: string
-}
+import type { User, Workspace, Space, List, Task } from '@/types/entities'
 
 interface AppStore {
   // UI State
   sidebarCollapsed: boolean
-  currentView: 'LIST' | 'BOARD' | 'CALENDAR' | 'GANTT' | 'TIMELINE' | 'TABLE' | 'MIND_MAP'
+  currentView: 'LIST' | 'BOARD' | 'CALENDAR' | 'GANTT' | 'TIMELINE' | 'TABLE'
   selectedWorkspace?: Workspace
   selectedSpace?: Space
   selectedList?: List
@@ -76,7 +23,7 @@ interface AppStore {
   
   // Actions
   setSidebarCollapsed: (collapsed: boolean) => void
-  setCurrentView: (view: 'LIST' | 'BOARD' | 'CALENDAR' | 'GANTT' | 'TIMELINE' | 'TABLE' | 'MIND_MAP') => void
+  setCurrentView: (view: 'LIST' | 'BOARD' | 'CALENDAR' | 'GANTT' | 'TIMELINE' | 'TABLE') => void
   setSelectedWorkspace: (workspace: Workspace | undefined) => void
   setSelectedSpace: (space: Space | undefined) => void
   setSelectedList: (list: List | undefined) => void

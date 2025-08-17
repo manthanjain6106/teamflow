@@ -114,17 +114,33 @@ export function useTasks(params?: {
       setLoading(true);
       setError(null);
       const data = await fetchTasks(params);
-      setTasks(data);
+      setTasks(data || []); // Ensure we always set an array
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load tasks');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load tasks';
+      setError(errorMessage);
+      setTasks([]); // Set empty array on error
       console.error('Task loading error:', err);
+      
+      // Additional debugging
+      if (err instanceof Error) {
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack,
+          params
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadTasks();
+    // Add a small delay to ensure session is loaded
+    const timeoutId = setTimeout(() => {
+      loadTasks();
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [params?.listId, params?.spaceId, params?.status, params?.assigneeId]);
 
   return { tasks, loading, error, refetch: loadTasks };

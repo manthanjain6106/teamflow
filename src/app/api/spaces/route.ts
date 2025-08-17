@@ -31,15 +31,27 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user has access to the workspace
-    const workspaceMember = await prisma.workspaceMember.findFirst({
+    let workspaceMember = await prisma.workspaceMember.findFirst({
       where: {
         workspaceId,
         userId: session.user.id
       }
     })
 
+    // Auto-heal legacy data: if the user is the creator but membership is missing, add OWNER membership
     if (!workspaceMember) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
+      if (workspace && workspace.createdById === session.user.id) {
+        workspaceMember = await prisma.workspaceMember.create({
+          data: {
+            workspaceId,
+            userId: session.user.id,
+            role: 'OWNER'
+          }
+        })
+      } else {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     const spaces = await prisma.space.findMany({

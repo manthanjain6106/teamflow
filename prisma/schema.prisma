@@ -15,6 +15,10 @@ model User {
   image         String?
   role          UserRole  @default(USER)
   emailVerified DateTime?
+  // Two-factor authentication
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorSecret  String?
+  recoveryCodes    String[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -38,6 +42,13 @@ model User {
   notifications       Notification[]
   activities          Activity[]
   invitationsSent     Invitation[]    @relation("InvitationsByUser")
+  // New relations
+  taskAssignments     TaskAssignment[]
+  reminders           Reminder[]
+  annotations         AttachmentAnnotation[]
+  milestoneOwnerships Milestone[]
+  sprintCapacities    SprintCapacity[]
+  
 
   @@map("users")
 }
@@ -102,6 +113,11 @@ model Workspace {
   documents Document[]
   documentFolders DocumentFolder[]
   invitations     Invitation[]        @relation("InvitationsForWorkspace")
+  // New relations
+  sprints         Sprint[]
+  milestones      Milestone[]
+  automationRules AutomationRule[]
+  
 
   @@map("workspaces")
 }
@@ -156,6 +172,7 @@ model Space {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User      @relation("SpaceCreator", fields: [createdById], references: [id])
   lists     List[]
+  milestones Milestone[]
 
   @@map("spaces")
 }
@@ -177,6 +194,7 @@ model List {
   space     Space  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   createdBy User   @relation("ListCreator", fields: [createdById], references: [id])
   tasks     Task[]
+  statuses  Status[]
 
   @@map("lists")
 }
@@ -192,6 +210,7 @@ model Task {
   estimatedTime Int? // in minutes
   actualTime    Int? // in minutes
   progress      Int          @default(0)
+  storyPoints   Int?
   tags          String[]
   customFields  Json?
   position      Int          @default(0)
@@ -215,6 +234,15 @@ model Task {
   parentTask  Task?            @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   parentTaskId String?         @db.ObjectId
   activities  Activity[]
+  // New relationships
+  assignments TaskAssignment[]
+  checklist   ChecklistItem[]
+  relationsFrom TaskRelation[] @relation("RelationsFrom")
+  relationsTo   TaskRelation[] @relation("RelationsTo")
+  sprintItems   SprintTask[]
+  reminderFor   Reminder[]
+  recurrence    RecurrenceRule?
+  milestoneLinks MilestoneTask[]
 
   @@map("tasks")
 }
@@ -247,8 +275,26 @@ model TaskAttachment {
   // Relationships
   task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   uploadedBy User @relation(fields: [uploadedById], references: [id])
+  versions   AttachmentVersion[]
+  annotations AttachmentAnnotation[]
 
   @@map("task_attachments")
+}
+
+// Versioning for attachments
+model AttachmentVersion {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  attachmentId String   @db.ObjectId
+  url          String
+  size         Int?
+  type         String?
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+
+  attachment TaskAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@map("attachment_versions")
+  @@index([attachmentId])
 }
 
 model TaskShare {
@@ -286,6 +332,187 @@ model TimeEntry {
   @@map("time_entries")
 }
 
+// Multiple assignees per task
+model TaskAssignment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  taskId    String   @db.ObjectId
+  userId    String   @db.ObjectId
+  role      String?
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@map("task_assignments")
+}
+
+// Checklists within tasks
+model ChecklistItem {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  taskId    String   @db.ObjectId
+  content   String
+  completed Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("checklist_items")
+}
+
+// Task relationships (dependencies, duplicates, related)
+model TaskRelation {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  fromTaskId  String           @db.ObjectId
+  toTaskId    String           @db.ObjectId
+  type        TaskRelationType @default(RELATES)
+  createdAt   DateTime         @default(now())
+
+  from Task @relation("RelationsFrom", fields: [fromTaskId], references: [id], onDelete: Cascade)
+  to   Task @relation("RelationsTo", fields: [toTaskId], references: [id], onDelete: Cascade)
+
+  @@index([fromTaskId])
+  @@index([toTaskId])
+  @@map("task_relations")
+}
+
+// Agile sprints
+model Sprint {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  goal        String?
+  startDate   DateTime
+  endDate     DateTime
+  workspaceId String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  status      SprintStatus @default(PLANNED)
+  completedAt DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks      SprintTask[]
+  goals      SprintGoalItem[]
+  capacities SprintCapacity[]
+
+  @@map("sprints")
+}
+
+// Sprint-task join
+model SprintTask {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  sprintId  String   @db.ObjectId
+  taskId    String   @db.ObjectId
+  createdAt DateTime @default(now())
+
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([sprintId, taskId])
+  @@map("sprint_tasks")
+}
+
+// Project milestones
+model Milestone {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  targetDate  DateTime
+  workspaceId String   @db.ObjectId
+  spaceId     String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  status      MilestoneStatus @default(PLANNED)
+  progress    Int      @default(0)
+  ownerId     String?  @db.ObjectId
+  completedAt DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  space     Space?    @relation(fields: [spaceId], references: [id])
+  owner     User?     @relation(fields: [ownerId], references: [id])
+  tasks     MilestoneTask[]
+
+  @@map("milestones")
+}
+
+model MilestoneTask {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  milestoneId  String   @db.ObjectId
+  taskId       String   @db.ObjectId
+  addedAt      DateTime @default(now())
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([milestoneId, taskId])
+  @@map("milestone_tasks")
+}
+
+// Sprint goal checklist items
+model SprintGoalItem {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  sprintId  String   @db.ObjectId
+  content   String
+  completed Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+
+  @@map("sprint_goal_items")
+  @@index([sprintId])
+}
+
+// Sprint per-member capacity planning
+model SprintCapacity {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  sprintId  String   @db.ObjectId
+  userId    String   @db.ObjectId
+  hours     Int?     // planned hours
+  points    Int?     // planned points
+  createdAt DateTime @default(now())
+
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sprintId, userId])
+  @@map("sprint_capacity")
+}
+
+// Reminders for tasks or general
+model Reminder {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  taskId      String?  @db.ObjectId
+  title       String
+  remindAt    DateTime
+  createdAt   DateTime @default(now())
+  sentAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, remindAt])
+  @@map("reminders")
+}
+
+// Automations (trigger -> actions)
+model AutomationRule {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  workspaceId String   @db.ObjectId
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  trigger     Json
+  actions     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("automation_rules")
+}
 model Goal {
   id          String     @id @default(auto()) @map("_id") @db.ObjectId
   title       String
@@ -348,6 +575,22 @@ model Document {
   @@map("documents")
 }
 
+// Custom statuses per list (optional). Tasks can still use enum `status`.
+model Status {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  listId    String   @db.ObjectId
+  name      String
+  color     String?
+  order     Int      @default(0)
+  isDone    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  list List @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@map("statuses")
+  @@index([listId])
+}
+
 model Notification {
   id        String           @id @default(auto()) @map("_id") @db.ObjectId
   type      NotificationType
@@ -379,6 +622,54 @@ model Activity {
 
   @@map("activities")
 }
+
+// Task recurrence rules
+model RecurrenceRule {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  taskId       String   @unique @db.ObjectId
+  frequency    String   // DAILY, WEEKLY, MONTHLY, CUSTOM
+  interval     Int      @default(1)
+  byWeekday    String[] // e.g., ["MO","WE"]
+  byMonthDay   Int[]
+  endsAt       DateTime?
+  nextRunAt    DateTime?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("recurrence_rules")
+}
+
+// Proofing/annotations on attachments
+model AttachmentAnnotation {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  attachmentId String   @db.ObjectId
+  authorId     String   @db.ObjectId
+  // Position can be coordinates or a timestamp for video
+  position     Json
+  comment      String
+  createdAt    DateTime @default(now())
+
+  attachment TaskAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  author     User           @relation(fields: [authorId], references: [id])
+
+  @@map("attachment_annotations")
+  @@index([attachmentId])
+}
+
+// Checklist templates
+model ChecklistTemplate {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  items     Json     // [{ content: string }]
+  scope     String?  // optional scope like listId/spaceId
+  createdAt DateTime @default(now())
+
+  @@map("checklist_templates")
+}
+
+// Whiteboard model removed
 
 // Global search index entries
 model SearchIndex {
@@ -421,6 +712,28 @@ enum TaskPriority {
   HIGH
   NORMAL
   LOW
+}
+
+enum TaskRelationType {
+  RELATES
+  BLOCKS
+  IS_BLOCKED_BY
+  DUPLICATES
+  IS_DUPLICATED_BY
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum MilestoneStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
 }
 
 enum GoalStatus {

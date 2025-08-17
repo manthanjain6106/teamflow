@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { runAutomations } from '@/app/api/automations/runner'
 
 const updateTaskSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -111,7 +112,7 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } } | { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -119,12 +120,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const taskId = params.id
+    const resolved = 'params' in context && typeof (context as any).params?.then !== 'function'
+      ? (context as { params: { id: string } }).params
+      : await (context as { params: Promise<{ id: string }> }).params
+
+    const taskId = resolved.id
     const body = await request.json()
     const validatedData = updateTaskSchema.parse(body)
 
     // Retry transaction a few times to avoid Mongo write conflicts
-    const runOnce = async () => prisma.$transaction(async (tx) => {
+    const runOnce = async () => {
+      const updatedTask = await prisma.$transaction(async (tx) => {
       // Check if user has access to the task
       const existingTask = await tx.task.findFirst({
         where: {
@@ -207,7 +213,7 @@ export async function PATCH(
       }
 
       // Update the task
-      const updatedTask = await tx.task.update({
+      const updatedTaskInner = await tx.task.update({
         where: { id: taskId },
         data: updateData,
         include: {
@@ -258,10 +264,10 @@ export async function PATCH(
         activities.push({
           type: validatedData.status === 'DONE' ? 'TASK_COMPLETED' : 'TASK_UPDATED',
           message: `Changed task status to "${validatedData.status}"`,
-          taskId: updatedTask.id,
+          taskId: updatedTaskInner.id,
           userId: session.user.id,
           data: {
-            taskName: updatedTask.name,
+            taskName: updatedTaskInner.name,
             oldStatus: existingTask.status,
             newStatus: validatedData.status
           }
@@ -271,11 +277,11 @@ export async function PATCH(
       if (validatedData.assigneeId && validatedData.assigneeId !== existingTask.assigneeId) {
         activities.push({
           type: 'TASK_ASSIGNED',
-          message: `Assigned task to ${updatedTask.assignee?.name || 'someone'}`,
-          taskId: updatedTask.id,
+          message: `Assigned task to ${updatedTaskInner.assignee?.name || 'someone'}`,
+          taskId: updatedTaskInner.id,
           userId: session.user.id,
           data: {
-            taskName: updatedTask.name,
+            taskName: updatedTaskInner.name,
             assigneeId: validatedData.assigneeId
           }
         })
@@ -288,8 +294,21 @@ export async function PATCH(
         })
       }
 
+      return updatedTaskInner
+      }, { timeout: 15000 })
+
+      // Fire automations best-effort, outside the transaction
+      try {
+        const space = await prisma.list.findUnique({ where: { id: updatedTask.listId }, select: { space: { select: { workspaceId: true } } } })
+        const workspaceId = space?.space.workspaceId as string | undefined
+        if (workspaceId) {
+          // Do not await to avoid blocking the response
+          runAutomations({ type: 'TASK_UPDATED', task: { id: updatedTask.id, name: updatedTask.name, status: updatedTask.status, priority: updatedTask.priority, listId: updatedTask.listId, createdById: updatedTask.createdById, assigneeId: updatedTask.assigneeId }, workspaceId, actorId: session.user.id, changes: {} }).catch((e) => console.error('Automation error', e))
+        }
+      } catch (e) { console.error('Workspace lookup error', e) }
+
       return updatedTask
-    })
+    }
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {

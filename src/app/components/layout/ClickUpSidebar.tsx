@@ -40,7 +40,8 @@ import {
   MessageSquare,
   Activity,
   Loader2,
-  Grid
+  Grid,
+  Shapes
 } from 'lucide-react';
 
 interface ClickUpSidebarProps {
@@ -105,6 +106,8 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
     }
   }, [lists, setLists]);
 
+  // no-op
+
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -167,11 +170,25 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
       color: 'text-pink-600'
     },
     {
+      name: 'Sprints',
+      href: '/app/sprints',
+      icon: Grid,
+      active: pathname === '/app/sprints',
+      color: 'text-indigo-600'
+    },
+    {
       name: 'Goals',
       href: '/app/goals',
       icon: Target,
       active: pathname === '/app/goals',
       color: 'text-teal-600'
+    },
+    {
+      name: 'Milestones',
+      href: '/app/milestones',
+      icon: Target,
+      active: pathname === '/app/milestones',
+      color: 'text-emerald-600'
     }
   ];
 
@@ -294,6 +311,27 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
       </div>
       {showWorkspaceMenu && (
         <div className="absolute left-2 right-2 top-12 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2">
+          {/* Switcher */}
+          <div className="max-h-56 overflow-auto">
+            {(workspaces || []).map((ws: any) => (
+              <button
+                key={ws.id}
+                onClick={() => {
+                  setSelectedWorkspace(ws);
+                  setShowWorkspaceMenu(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-sm rounded flex items-center justify-between ${
+                  selectedWorkspace?.id === ws.id ? 'bg-purple-50 dark:bg-purple-900/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <span className="truncate">{ws.name}</span>
+                {selectedWorkspace?.id === ws.id && (
+                  <span className="text-xs text-purple-600">Current</span>
+                )}
+              </button>
+            ))}
+          </div>
+          <hr className="my-2 border-gray-200 dark:border-gray-700" />
           <button
             onClick={() => {
               setShowWorkspaceMenu(false);
@@ -571,9 +609,17 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                     {lists
                       .filter((list: any) => list.spaceId === space.id)
                       .map((list: any) => (
-                        <button
+                        <div
                           key={list.id}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => handleListClick(list)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleListClick(list);
+                            }
+                          }}
                           className={`flex items-center w-full px-2 py-0.5 text-xs transition-colors rounded ${
                             selectedList?.id === list.id
                               ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' 
@@ -599,7 +645,7 @@ export default function ClickUpSidebar({ className = '' }: ClickUpSidebarProps) 
                           >
                             <Trash2 className="h-3 w-3" />
                           </button>
-                        </button>
+                        </div>
                       ))}
                     <button 
                       className="flex items-center px-2 py-0.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors w-full"

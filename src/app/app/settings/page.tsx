@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { fetchWorkspaceMembers, addWorkspaceMember, updateWorkspaceMemberRole, removeWorkspaceMember, fetchUserSettings, updateUserSettings } from '@/lib/api';
+import { TwoFactorSettings } from './two-factor';
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -278,10 +279,7 @@ export default function SettingsPage() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Add an extra layer of security to your account by enabling 2FA.
             </p>
-            <button className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-              <Key className="h-4 w-4" />
-              <span>Enable 2FA</span>
-            </button>
+            <TwoFactorSettings />
           </div>
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">

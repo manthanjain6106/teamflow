@@ -73,17 +73,37 @@ export async function fetchTasks(params?: {
   status?: string;
   assigneeId?: string;
 }) {
-  const searchParams = new URLSearchParams();
-  if (params?.listId) searchParams.append('listId', params.listId);
-  if (params?.spaceId) searchParams.append('spaceId', params.spaceId);
-  if (params?.status) searchParams.append('status', params.status);
-  if (params?.assigneeId) searchParams.append('assigneeId', params.assigneeId);
+  try {
+    const searchParams = new URLSearchParams();
+    if (params?.listId) searchParams.append('listId', params.listId);
+    if (params?.spaceId) searchParams.append('spaceId', params.spaceId);
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.assigneeId) searchParams.append('assigneeId', params.assigneeId);
 
-  const response = await fetch(`/api/tasks?${searchParams.toString()}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch tasks');
+    const response = await fetch(`/api/tasks?${searchParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // Include cookies for authentication
+    });
+    
+    // Gracefully handle unauthorized/forbidden by returning an empty list
+    if (response.status === 401 || response.status === 403) {
+      return [];
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error || `Failed to fetch tasks (${response.status})`;
+      throw new Error(errorMessage);
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error('fetchTasks error:', error);
+    throw error;
   }
-  return response.json();
 }
 
 // Create functions
@@ -100,7 +120,8 @@ export async function createWorkspace(data: {
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error('Failed to create workspace');
+    const err = await response.json().catch(() => ({} as { error?: string }));
+    throw new Error(err.error || 'Failed to create workspace');
   }
   return response.json();
 }
@@ -210,8 +231,9 @@ export async function updateTask(data: {
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await attempt();
-    } catch (e: any) {
-      if (e?.message !== 'RETRYABLE' || i === maxRetries - 1) throw e;
+    } catch (e: unknown) {
+      const message = typeof e === 'object' && e && 'message' in e ? String((e as { message?: unknown }).message) : '';
+      if (message !== 'RETRYABLE' || i === maxRetries - 1) throw e;
       await new Promise((r) => setTimeout(r, delay));
       delay *= 2;
     }
@@ -487,6 +509,253 @@ export async function fetchGoals(params: {
     throw new Error('Failed to fetch goals');
   }
   return response.json();
+}
+
+export async function fetchSprints(params: { workspaceId: string }) {
+  const url = new URL('/api/sprints', window.location.origin)
+  url.searchParams.set('workspaceId', params.workspaceId)
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error('Failed to fetch sprints')
+  return res.json()
+}
+
+export async function createSprint(data: { name: string; goal?: string; startDate: string; endDate: string; workspaceId: string; }) {
+  const res = await fetch('/api/sprints', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to create sprint')
+  return res.json()
+}
+
+export async function updateSprint(data: { id: string; name?: string; goal?: string; startDate?: string; endDate?: string; status?: 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' }) {
+  const res = await fetch('/api/sprints', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  let payload: any = null
+  try { payload = await res.json() } catch {}
+  if (!res.ok) throw new Error(payload?.error || 'Failed to update sprint')
+  return payload
+}
+
+export async function fetchSprintTasks(sprintId: string) {
+  const res = await fetch(`/api/sprints/${sprintId}/tasks`)
+  if (!res.ok) throw new Error('Failed to fetch sprint tasks')
+  return res.json()
+}
+
+export async function fetchSprintMetrics(sprintId: string) {
+  const url = new URL('/api/sprints/metrics', window.location.origin)
+  url.searchParams.set('sprintId', sprintId)
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error('Failed to fetch sprint metrics')
+  return res.json()
+}
+
+export async function fetchSprintGoals(sprintId: string) {
+  const res = await fetch(`/api/sprints/${sprintId}/goals`)
+  if (!res.ok) throw new Error('Failed to fetch sprint goals')
+  return res.json()
+}
+
+export async function addSprintGoal(sprintId: string, content: string, order = 0) {
+  const res = await fetch(`/api/sprints/${sprintId}/goals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, order }) })
+  if (!res.ok) throw new Error('Failed to add sprint goal')
+  return res.json()
+}
+
+export async function updateSprintGoal(data: { id: string; content?: string; completed?: boolean; order?: number }) {
+  const res = await fetch(`/api/sprints/${(data as any).sprintId || ''}/goals`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to update sprint goal')
+  return res.json()
+}
+
+export async function deleteSprintGoal(id: string) {
+  const url = new URL('/api/sprints/any/goals', window.location.origin)
+  url.searchParams.set('id', id)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete sprint goal')
+  return res.json()
+}
+
+export async function fetchSprintCapacity(sprintId: string) {
+  const res = await fetch(`/api/sprints/${sprintId}/capacity`)
+  if (!res.ok) throw new Error('Failed to fetch capacity')
+  return res.json()
+}
+
+export async function upsertSprintCapacity(sprintId: string, userId: string, hours?: number, points?: number) {
+  const res = await fetch(`/api/sprints/${sprintId}/capacity`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, hours, points }) })
+  if (!res.ok) throw new Error('Failed to update capacity')
+  return res.json()
+}
+
+export async function deleteSprintCapacity(sprintId: string, userId: string) {
+  const url = new URL(`/api/sprints/${sprintId}/capacity`, window.location.origin)
+  url.searchParams.set('userId', userId)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete capacity')
+  return res.json()
+}
+
+// Whiteboards removed
+
+export async function addTaskToSprint(sprintId: string, taskId: string) {
+  const res = await fetch(`/api/sprints/${sprintId}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskId }) })
+  if (!res.ok) throw new Error('Failed to add task to sprint')
+  return res.json()
+}
+
+export async function removeTaskFromSprint(sprintId: string, taskId: string) {
+  const url = new URL(`/api/sprints/${sprintId}/tasks`, window.location.origin)
+  url.searchParams.set('taskId', taskId)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to remove sprint task')
+  return res.json()
+}
+
+export async function fetchTaskRelations(taskId: string) {
+  const url = new URL('/api/task-relations', window.location.origin)
+  url.searchParams.set('taskId', taskId)
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error('Failed to fetch task relations')
+  return res.json()
+}
+
+export async function addTaskRelation(data: { fromTaskId: string; toTaskId: string; type: 'RELATES' | 'BLOCKS' | 'IS_BLOCKED_BY' | 'DUPLICATES' | 'IS_DUPLICATED_BY' }) {
+  const res = await fetch('/api/task-relations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to add relation')
+  return res.json()
+}
+
+export async function removeTaskRelation(id: string) {
+  const url = new URL('/api/task-relations', window.location.origin)
+  url.searchParams.set('id', id)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to remove relation')
+  return res.json()
+}
+
+export async function fetchChecklist(taskId: string) {
+  const url = new URL('/api/checklists', window.location.origin)
+  url.searchParams.set('taskId', taskId)
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error('Failed to fetch checklist')
+  return res.json()
+}
+
+export async function addChecklistItem(data: { taskId: string; content: string; order?: number }) {
+  const res = await fetch('/api/checklists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to add checklist item')
+  return res.json()
+}
+
+export async function updateChecklistItem(data: { id: string; content?: string; completed?: boolean; order?: number }) {
+  const res = await fetch('/api/checklists', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to update checklist item')
+  return res.json()
+}
+
+export async function deleteChecklistItem(id: string) {
+  const url = new URL('/api/checklists', window.location.origin)
+  url.searchParams.set('id', id)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete checklist item')
+  return res.json()
+}
+
+export async function fetchTaskAssignments(taskId: string) {
+  const url = new URL('/api/task-assignments', window.location.origin)
+  url.searchParams.set('taskId', taskId)
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error('Failed to fetch assignments')
+  return res.json()
+}
+
+export async function addTaskAssignment(data: { taskId: string; userId: string; role?: string }) {
+  const res = await fetch('/api/task-assignments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to add assignment')
+  return res.json()
+}
+
+export async function removeTaskAssignment(taskId: string, userId: string) {
+  const url = new URL('/api/task-assignments', window.location.origin)
+  url.searchParams.set('taskId', taskId)
+  url.searchParams.set('userId', userId)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to remove assignment')
+  return res.json()
+}
+
+export async function fetchAutomations(workspaceId: string) {
+  const url = new URL('/api/automations', window.location.origin)
+  url.searchParams.set('workspaceId', workspaceId)
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error('Failed to fetch automations')
+  return res.json()
+}
+
+export async function createAutomation(data: { workspaceId: string; name: string; description?: string; active?: boolean; trigger: any; actions: any }) {
+  const res = await fetch('/api/automations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to create automation')
+  return res.json()
+}
+
+export async function updateAutomation(data: { id: string; name?: string; description?: string; active?: boolean; trigger?: any; actions?: any }) {
+  const res = await fetch('/api/automations', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to update automation')
+  return res.json()
+}
+
+export async function deleteAutomation(id: string) {
+  const url = new URL('/api/automations', window.location.origin)
+  url.searchParams.set('id', id)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete automation')
+  return res.json()
+}
+
+export async function fetchReminders() {
+  const res = await fetch('/api/reminders')
+  if (!res.ok) throw new Error('Failed to fetch reminders')
+  return res.json()
+}
+
+export async function createReminder(data: { title: string; remindAt: string; taskId?: string }) {
+  const res = await fetch('/api/reminders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to create reminder')
+  return res.json()
+}
+
+export async function deleteReminder(id: string) {
+  const url = new URL('/api/reminders', window.location.origin)
+  url.searchParams.set('id', id)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete reminder')
+  return res.json()
+}
+
+export async function fetchMilestones(workspaceId: string) {
+  const url = new URL('/api/milestones', window.location.origin)
+  url.searchParams.set('workspaceId', workspaceId)
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error('Failed to fetch milestones')
+  return res.json()
+}
+
+export async function createMilestone(data: { title: string; description?: string; targetDate: string; workspaceId: string; spaceId?: string }) {
+  const res = await fetch('/api/milestones', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to create milestone')
+  return res.json()
+}
+
+export async function updateMilestone(data: { id: string; title?: string; description?: string; targetDate?: string }) {
+  const res = await fetch('/api/milestones', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error('Failed to update milestone')
+  return res.json()
+}
+
+export async function deleteMilestone(id: string) {
+  const url = new URL('/api/milestones', window.location.origin)
+  url.searchParams.set('id', id)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete milestone')
+  return res.json()
 }
 
 export async function createGoal(data: {

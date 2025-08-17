@@ -105,7 +105,7 @@ export default function ClickUpTableView() {
     return result;
   }, [tasks, filters, sortConfig]);
 
-  const getTaskValue = (task: any, key: string) => {
+  function getTaskValue(task: any, key: string) {
     switch (key) {
       case 'name': return task.name?.toLowerCase() || '';
       case 'assignee': return task.assignee?.name?.toLowerCase() || '';
@@ -116,7 +116,7 @@ export default function ClickUpTableView() {
       case 'updated': return task.updatedAt || '';
       default: return '';
     }
-  };
+  }
 
   const handleSort = (key: string) => {
     setSortConfig(prev => ({

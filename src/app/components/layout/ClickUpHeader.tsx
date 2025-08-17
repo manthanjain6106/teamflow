@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
-import { Bell, Settings, User, Plus, MoreHorizontal, Hash, FolderOpen, Command, List, LayoutGrid, Table, Calendar, BarChart3, Clock, Brain, CheckSquare2, FileText, Target } from 'lucide-react';
+import { Bell, Settings, User, Plus, MoreHorizontal, Hash, FolderOpen, Command, List, LayoutGrid, Table, Calendar, BarChart3, Clock, CheckSquare2, FileText, Target } from 'lucide-react';
 import GlobalSearch from '@/app/components/ui/GlobalSearch';
 import dynamic from 'next/dynamic';
 const CreateWorkspaceModal = dynamic(() => import('@/app/components/ui/CreateWorkspaceModal'), { ssr: false });
@@ -21,7 +21,7 @@ interface ClickUpHeaderProps {
 }
 
 export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, showViewSwitcher }: ClickUpHeaderProps) {
-  const { selectedWorkspace, selectedSpace, selectedList, currentView, setCurrentView } = useStore();
+  const { selectedWorkspace, selectedSpace, selectedList, currentView, setCurrentView, workspaces } = useStore();
   const [searchOpen, setSearchOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -77,17 +77,19 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
     if (selectedList) return selectedList.name;
     if (selectedSpace) return selectedSpace.name;
     if (selectedWorkspace) return selectedWorkspace.name;
+    if (workspaces && workspaces.length > 0) return workspaces[0]?.name || 'TeamFlow';
     return 'TeamFlow';
   };
 
   const getBreadcrumbs = () => {
     const crumbs = [];
     
-    if (selectedWorkspace) {
+    const wsForCrumb = selectedWorkspace || (workspaces && workspaces.length > 0 ? workspaces[0] : undefined)
+    if (wsForCrumb) {
       crumbs.push({
-        label: selectedWorkspace.name,
+        label: wsForCrumb.name,
         icon: <div className="w-4 h-4 bg-purple-600 text-white rounded text-xs flex items-center justify-center font-bold">
-          {selectedWorkspace.name[0]?.toUpperCase()}
+          {wsForCrumb.name[0]?.toUpperCase()}
         </div>
       });
     }
@@ -274,17 +276,7 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
                 <Clock className="h-4 w-4" />
                 <span>Timeline</span>
               </button>
-              <button
-                onClick={() => setCurrentView('MIND_MAP')}
-                className={`flex items-center space-x-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  currentView === 'MIND_MAP'
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                <Brain className="h-4 w-4" />
-                <span>Mind Map</span>
-              </button>
+              {/* Mind Map removed */}
             </div>
           )}
           {(selectedList || selectedSpace) && (
@@ -311,7 +303,6 @@ export default function ClickUpHeader({ title, breadcrumbs: layoutBreadcrumbs, s
                       { key: 'CALENDAR', label: 'Calendar' },
                       { key: 'GANTT', label: 'Gantt' },
                       { key: 'TIMELINE', label: 'Timeline' },
-                      { key: 'MIND_MAP', label: 'Mind Map' },
                     ].map((v) => (
                       <button
                         key={v.key}
